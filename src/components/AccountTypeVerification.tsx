@@ -217,9 +217,14 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
     const isVerified = currentUser.verified;
     const isUnderReview = currentUser.verificationStatus === 'under-review';
     
-    console.log('✅ AgriLink verification state:', (userRequested || isVerified || isUnderReview) ? 'true' : 'false');
+    // For rejected users, reset agriLinkVerificationRequested to false so they can re-upload
+    const isRejected = currentUser.verificationStatus === 'rejected';
+    const shouldShowAsRequested = (userRequested || isVerified || isUnderReview) && !isRejected;
+    
+    console.log('✅ AgriLink verification state:', shouldShowAsRequested ? 'true' : 'false');
     // Treat under_review as requested so the button shows blue and stays disabled after refresh
-    setAgriLinkVerificationRequested(Boolean(userRequested || isVerified || isUnderReview));
+    // But for rejected users, reset to false so they can re-upload documents
+    setAgriLinkVerificationRequested(Boolean(shouldShowAsRequested));
     
     // Reset verification submitted flag when user data refreshes
     if (userRequested || isVerified) {
@@ -389,39 +394,50 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
   
   const handleDocumentPreview = async (documentData: string, documentName: string) => {
     try {
-      if (!documentData || !documentData.startsWith('data:')) {
-        alert('Invalid document data');
+      if (!documentData) {
+        alert('No document data available');
         return;
       }
 
-      // Convert Data URL to Blob URL for safer display
-      const [header, base64Data] = documentData.split(',');
-      const mimeType = header.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
-      
-      // Clean and fix base64 data
-      let cleanBase64 = base64Data.replace(/[^A-Za-z0-9+/]/g, '');
-      while (cleanBase64.length % 4) {
-        cleanBase64 += '=';
+      // Handle file path (new format) or base64 data (legacy format)
+      if (documentData.startsWith('/uploads/')) {
+        // File path format - open directly
+        window.open(documentData, '_blank');
+        return;
+      } else if (documentData.startsWith('data:')) {
+        // Base64 data format (legacy)
+        // Convert Data URL to Blob URL for safer display
+        const [header, base64Data] = documentData.split(',');
+        const mimeType = header.match(/data:([^;]+)/)?.[1] || 'application/octet-stream';
+        
+        // Clean and fix base64 data
+        let cleanBase64 = base64Data.replace(/[^A-Za-z0-9+/]/g, '');
+        while (cleanBase64.length % 4) {
+          cleanBase64 += '=';
+        }
+
+        // Convert to binary
+        const binaryString = atob(cleanBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        // Create blob and blob URL
+        const blob = new Blob([bytes], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+
+        setPreviewDocument({
+          name: documentName,
+          data: blobUrl,
+          type: mimeType.startsWith('image/') ? 'image' : 'document',
+          originalData: documentData // Keep original for cleanup
+        });
+        setShowDocumentPreview(true);
+      } else {
+        alert('Invalid document format');
+        return;
       }
-
-      // Convert to binary
-      const binaryString = atob(cleanBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      // Create blob and blob URL
-      const blob = new Blob([bytes], { type: mimeType });
-      const blobUrl = URL.createObjectURL(blob);
-
-      setPreviewDocument({
-        name: documentName,
-        data: blobUrl,
-        type: mimeType.startsWith('image/') ? 'image' : 'document',
-        originalData: documentData // Keep original for cleanup
-      });
-      setShowDocumentPreview(true);
     } catch (error) {
       console.error('Error preparing document preview:', error);
       alert('Unable to preview document - invalid format');
@@ -1909,7 +1925,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           </Card>
 
           </>
-        ) : agriLinkVerificationRequested ? (
+        ) : agriLinkVerificationRequested && currentUser.verificationStatus !== 'rejected' ? (
           <>
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="p-4">
@@ -2075,131 +2091,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           </Card>
         )}
 
-        {/* Spacing and Separator for History Card */}
-        {(currentUser as any).rejectedDocuments && !currentUser.verified && currentUser.verificationStatus !== 'rejected' && ((currentUser.verificationStatus as any) === 'phone-verified' || currentUser.verificationStatus === 'under-review') && (
-          <>
-            {/* Moderate spacing */}
-            <div className="mt-8 mb-6">
-              {/* Section separator line */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-4 text-sm text-gray-500">Previous Submission History</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
 
-        {/* Rejection History Card - shown for users who have rejection history but are not currently rejected */}
-        {(currentUser as any).rejectedDocuments && !currentUser.verified && currentUser.verificationStatus !== 'rejected' && ((currentUser.verificationStatus as any) === 'phone-verified' || currentUser.verificationStatus === 'under-review') && (
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-orange-800 truncate">Previous Rejection History</p>
-                      <p className="text-sm text-orange-700 truncate">View rejection feedback and submitted documents</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                     <Button
-                       onClick={() => setShowRejectionReview(!showRejectionReview)}
-                       className="bg-orange-600 hover:bg-orange-700 text-white"
-                       size="sm"
-                     >
-                       <FileText className="w-4 h-4 mr-2" />
-                       {showRejectionReview ? 'Hide' : 'View Previous Rejection'}
-                     </Button>
-                  </div>
-                </div>
-
-                {/* Expandable Rejection Review Section */}
-                {showRejectionReview && (
-                  <div className="space-y-4 pt-4 border-t border-orange-200">
-                    {/* Admin Review Comments */}
-                    {rejectionDetails?.review_notes && (
-                      <div className="bg-orange-100 border border-orange-200 rounded-lg p-4">
-                        <h4 className="font-medium text-orange-800 mb-2">Reviewer Feedback:</h4>
-                        <p className="text-orange-700">{rejectionDetails.review_notes}</p>
-                      </div>
-                    )}
-                    
-                    {/* Review Date */}
-                    {rejectionDetails?.reviewed_at && (
-                      <p className="text-sm text-orange-600">
-                        Reviewed on: {new Date(rejectionDetails.reviewed_at).toLocaleDateString()}
-                      </p>
-                    )}
-                    
-                    {/* Previously Submitted Documents */}
-                    {(currentUser as any).rejectedDocuments && (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-orange-800">Previously Submitted Documents:</h4>
-                        <div className="space-y-2">
-                          {(currentUser as any).rejectedDocuments.idCard && (currentUser as any).rejectedDocuments.idCard.data && (
-                            <div className="flex items-center gap-3 p-3 bg-orange-100 rounded border border-orange-200">
-                              <FileText className="w-4 h-4 text-orange-600" />
-                              <span className="text-sm text-orange-800 flex-1">ID Card Document</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDocumentPreview(
-                                  (currentUser as any).rejectedDocuments.idCard.data,
-                                  'ID Card Document'
-                                )}
-                                className="text-orange-700 hover:text-orange-800"
-                              >
-                                View
-                              </Button>
-                            </div>
-                          )}
-                          
-                          {(currentUser as any).rejectedDocuments.businessLicense && (currentUser as any).rejectedDocuments.businessLicense.data && (
-                            <div className="flex items-center gap-3 p-3 bg-orange-100 rounded border border-orange-200">
-                              <FileText className="w-4 h-4 text-orange-600" />
-                              <span className="text-sm text-orange-800 flex-1">Business License</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDocumentPreview(
-                                  (currentUser as any).rejectedDocuments.businessLicense.data,
-                                  'Business License'
-                                )}
-                                className="text-orange-700 hover:text-orange-800"
-                              >
-                                View
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Close Button */}
-                    <div className="pt-4 border-t border-orange-200">
-                      <div className="flex justify-end">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowRejectionReview(false)}
-                          className="border-orange-300 text-orange-700 hover:bg-orange-100"
-                        >
-                          Close
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Success Message for Verified Users */}
         {currentUser.verified && (

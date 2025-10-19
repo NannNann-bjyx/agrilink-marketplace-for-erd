@@ -46,14 +46,29 @@ export function EmailVerificationPrompt({
     setRateLimitMessage('');
     
     try {
-      await onResendVerification();
-      setResendStatus('success');
+      const result = await onResendVerification();
+      
+      // Handle the new return format
+      if (result && typeof result === 'object') {
+        if (result.success) {
+          setResendStatus('success');
+        } else if (result.rateLimited) {
+          setResendStatus('rate_limited');
+          setRateLimitMessage(result.message);
+        } else {
+          setResendStatus('error');
+          setRateLimitMessage(result.message || 'Failed to send verification email');
+        }
+      } else {
+        // Fallback for old format (if function doesn't return anything)
+        setResendStatus('success');
+      }
     } catch (error) {
       console.error('Error resending verification email:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       // Check if it's a rate limiting error
-      if (errorMessage.includes('wait a minute') || errorMessage.includes('wait a few minutes')) {
+      if (errorMessage.includes('wait') && (errorMessage.includes('second') || errorMessage.includes('minute'))) {
         setResendStatus('rate_limited');
         setRateLimitMessage(errorMessage);
       } else {

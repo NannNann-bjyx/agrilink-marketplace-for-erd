@@ -31,12 +31,12 @@ const getDatabaseUrl = () => {
   
   // Fallback: Development database (for local development)
   console.log('🎯 Using FALLBACK database');
-  return 'postgresql://neondb_owner:npg_0Usptraqf7om@ep-divine-haze-ag9kgfk7-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  return 'postgresql://neondb_owner:npg_aTAqWBZ3g7uF@ep-weathered-sea-agu2wq5l-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 };
 
 const databaseUrl = getDatabaseUrl();
 
-console.log('🔗 Database URL:', databaseUrl.includes('ep-divine-haze') ? '✅ DEVELOPMENT' : '✅ PRODUCTION/STAGING');
+console.log('🔗 Database URL:', databaseUrl.includes('ep-weathered-sea') ? '✅ DEVELOPMENT' : '✅ PRODUCTION/STAGING');
 
 // Initialize Neon connection
 const sql = neon(databaseUrl);

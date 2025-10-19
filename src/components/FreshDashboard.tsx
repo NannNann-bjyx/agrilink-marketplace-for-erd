@@ -181,7 +181,12 @@ export function FreshDashboard({
                       // Handle rate limiting gracefully
                       if (response.status === 429 && errorData.recentlySent) {
                         console.log('⏰ Rate limited - email was recently sent');
-                        throw new Error('Please wait a minute before requesting another verification email.');
+                        // Instead of throwing an error, we'll handle this in the calling component
+                        return { 
+                          success: false, 
+                          rateLimited: true, 
+                          message: 'Please wait 10 seconds before requesting another verification email.' 
+                        };
                       }
                       
                       console.error('❌ Resend verification failed:', errorData);
@@ -190,6 +195,7 @@ export function FreshDashboard({
                     
                     const result = await response.json();
                     console.log('✅ Resend verification successful:', result);
+                    return { success: true, message: result.message };
                   } catch (error) {
                     console.error('❌ Error resending verification email:', error);
                     throw error;

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         u.id, u.email, u.name, u."userType", u."accountType", u."emailVerified", u."pendingEmail", u."createdAt",
         bd."businessName", bd."businessDescription", bd."businessLicenseNumber", bd.specialties,
         l.city, l.region, up.phone, up."profileImage", up."storefrontImage",
-        uv.verified, uv."phoneVerified", uv."verificationStatus", uv."verificationDocuments", uv."businessDetailsCompleted",
+        uv.verified, uv."phoneVerified", uv."verificationStatus", uv."verificationDocuments", uv."rejectedDocuments", uv."businessDetailsCompleted",
         uv."verificationSubmitted",
         vr."submittedAt" as "verificationSubmittedAt",
         ur.rating, ur."totalReviews"
@@ -125,6 +125,7 @@ export async function GET(request: NextRequest) {
         businessDescription: userProfile.businessDescription,
         businessLicenseNumber: userProfile.businessLicenseNumber,
         verificationDocuments: userProfile.verificationDocuments,
+        rejectedDocuments: userProfile.rejectedDocuments,
         verificationStatus: userProfile.verificationStatus,
         businessDetailsCompleted: userProfile.businessDetailsCompleted,
         agriLinkVerificationRequested: userProfile.verificationSubmitted || false,
@@ -467,7 +468,7 @@ export async function PUT(request: NextRequest) {
         u.id, u.email, u.name, u."userType", u."accountType", u."emailVerified", u."pendingEmail", u."createdAt",
         bd."businessName", bd."businessDescription", bd."businessLicenseNumber", bd.specialties,
         l.city, l.region, up.phone, up."profileImage", up."storefrontImage",
-        uv.verified, uv."phoneVerified", uv."verificationStatus", uv."verificationDocuments", uv."businessDetailsCompleted",
+        uv.verified, uv."phoneVerified", uv."verificationStatus", uv."verificationDocuments", uv."rejectedDocuments", uv."businessDetailsCompleted",
         ur.rating, ur."totalReviews"
       FROM users u
       LEFT JOIN user_profiles up ON u.id = up."userId"
@@ -555,6 +556,7 @@ export async function PUT(request: NextRequest) {
         businessDescription: updatedProfile.businessDescription,
         businessLicenseNumber: updatedProfile.businessLicenseNumber,
         verificationDocuments: updatedProfile.verificationDocuments,
+        rejectedDocuments: updatedProfile.rejectedDocuments,
         verificationStatus: updatedProfile.verificationStatus,
         businessDetailsCompleted: updatedProfile.businessDetailsCompleted,
         rating: parseFloat(updatedProfile.rating?.toString() || '0'),

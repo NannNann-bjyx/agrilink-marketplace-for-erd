@@ -48,13 +48,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if recent verification email was sent (within last 1 minute)
-    const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000);
-    if (user.emailVerificationExpires && new Date(user.emailVerificationExpires) > oneMinuteAgo) {
-      return NextResponse.json({ 
-        message: 'Verification email was recently sent. Please wait a minute before requesting another.',
-        recentlySent: true
-      }, { status: 429 });
+    // Simple rate limiting: only check if verification token is very recent (within 10 seconds)
+    // This prevents immediate spam while allowing reasonable resend attempts
+    if (user.emailVerificationExpires) {
+      const tokenCreatedTime = new Date(user.emailVerificationExpires).getTime() - (24 * 60 * 60 * 1000); // Subtract 24 hours to get creation time
+      const tenSecondsAgo = Date.now() - (10 * 1000);
+      
+      if (tokenCreatedTime > tenSecondsAgo) {
+        return NextResponse.json({ 
+          message: 'Verification email was recently sent. Please wait 10 seconds before requesting another.',
+          recentlySent: true
+        }, { status: 429 });
+      }
     }
 
     // Generate new verification token

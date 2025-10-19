@@ -100,16 +100,17 @@ export async function POST(request: NextRequest) {
     `;
     const docsToReject = (reqDocsRow && reqDocsRow.verificationDocuments) || (uvDocsRow && uvDocsRow.verificationDocuments) || null;
 
-    // Move/clear documents in user_verification
+    // Move/clear documents in user_verification and update status
     await sql`
       UPDATE user_verification 
       SET 
         "rejectedDocuments" = ${docsToReject},
         "verificationDocuments" = NULL,
+        "verificationStatus" = 'rejected',
         "updatedAt" = NOW()
       WHERE "userId" = ${verificationRequest.userId}
     `;
-    console.log('✅ Moved documents to rejectedDocuments and cleared active documents');
+    console.log('✅ Moved documents to rejectedDocuments, cleared active documents, and updated status to rejected');
 
     // Check if user_verification record exists
     const [existingVerification] = await sql`
@@ -130,19 +131,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Created user_verification record');
     } else {
       console.log('📊 Current user_verification status:', existingVerification);
-      
-      // Update user verification status in user_verification table
-      console.log('🔄 Updating user_verification table...');
-      await sql`
-        UPDATE user_verification 
-        SET 
-          "verificationStatus" = 'rejected',
-          verified = false,
-          "verificationSubmitted" = true,
-          "updatedAt" = NOW()
-        WHERE "userId" = ${verificationRequest.userId}
-      `;
-      console.log('✅ Updated user_verification table');
+      console.log('✅ User verification record already updated above');
     }
 
     console.log(`❌ Admin ${adminUser.email} rejected verification request for ${verificationRequest.userEmail}`);
