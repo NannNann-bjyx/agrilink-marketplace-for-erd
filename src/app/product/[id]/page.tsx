@@ -142,7 +142,11 @@ export default function ProductDetailsPage() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US').format(price);
+    // Format price with proper Myanmar currency formatting
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(price);
   };
 
   // Check if current user is the seller of this product
@@ -816,6 +820,15 @@ export default function ProductDetailsPage() {
                 tierLabel: product.sellerVerificationStatus?.trustLevel === 'business-verified' ? 'Business ✓' : 
                           product.sellerVerificationStatus?.trustLevel === 'id-verified' ? 'Verified' : 'Unverified',
                 levelBadge: product.sellerVerificationStatus?.trustLevel === 'unverified' ? '!' : '✓'
+              }}
+              product={{
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                unit: product.unit,
+                image: product.imageUrl,
+                sellerId: product.sellerId,
+                availableQuantity: product.availableQuantity || '0'
               }}
               currentUser={user}
             />

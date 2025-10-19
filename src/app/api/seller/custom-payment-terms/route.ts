@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sellerCustomPaymentTerms, users } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { sql } from '@/lib/db';
 import jwt from 'jsonwebtoken';
 
 // Helper function to verify JWT token
@@ -61,21 +59,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const customTerms = await db
-      .select({
-        id: sellerCustomPaymentTerms.id,
-        name: sellerCustomPaymentTerms.name,
-        description: sellerCustomPaymentTerms.description,
-        isActive: sellerCustomPaymentTerms.isActive,
-        createdAt: sellerCustomPaymentTerms.createdAt,
-        updatedAt: sellerCustomPaymentTerms.updatedAt,
-      })
-      .from(sellerCustomPaymentTerms)
-      .where(and(
-        eq(sellerCustomPaymentTerms.sellerId, sellerId),
-        eq(sellerCustomPaymentTerms.isActive, true)
-      ))
-      .orderBy(sellerCustomPaymentTerms.createdAt);
+    // Use raw SQL query instead of Drizzle ORM
+    const customTerms = await sql`
+      SELECT id, name, "isActive", "createdAt", "updatedAt"
+      FROM seller_custom_payment_terms
+      WHERE "sellerId" = ${sellerId} AND "isActive" = true
+      ORDER BY "createdAt"
+    `;
 
     return NextResponse.json({
       customTerms: customTerms.map(term => term.name)
@@ -97,7 +87,7 @@ export async function POST(request: NextRequest) {
     const sellerId = decoded.userId;
     
     const body = await request.json();
-    const { name, description } = body;
+    const { name } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -107,14 +97,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if term already exists for this seller
-    const existingTerm = await db
-      .select({ id: sellerCustomPaymentTerms.id })
-      .from(sellerCustomPaymentTerms)
-      .where(and(
-        eq(sellerCustomPaymentTerms.sellerId, sellerId),
-        eq(sellerCustomPaymentTerms.name, name.trim())
-      ))
-      .limit(1);
+    const existingTerm = await sql`
+      SELECT id FROM seller_custom_payment_terms
+      WHERE "sellerId" = ${sellerId} AND name = ${name.trim()}
+      LIMIT 1
+    `;
 
     if (existingTerm.length > 0) {
       return NextResponse.json(
@@ -124,19 +111,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new custom term
-    const newTerm = await db
-      .insert(sellerCustomPaymentTerms)
-      .values({
-        sellerId,
-        name: name.trim(),
-        description: description?.trim() || null,
-        isActive: true,
-      })
-      .returning({
-        id: sellerCustomPaymentTerms.id,
-        name: sellerCustomPaymentTerms.name,
-        description: sellerCustomPaymentTerms.description,
-      });
+    const newTerm = await sql`
+      INSERT INTO seller_custom_payment_terms ("sellerId", name, "isActive")
+      VALUES (${sellerId}, ${name.trim()}, true)
+      RETURNING id, name
+    `;
 
     return NextResponse.json({
       message: 'Custom payment term created successfully',
@@ -170,17 +149,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // First, get the term name to check for usage
-    const term = await db
-      .select({ 
-        id: sellerCustomPaymentTerms.id,
-        name: sellerCustomPaymentTerms.name 
-      })
-      .from(sellerCustomPaymentTerms)
-      .where(and(
-        eq(sellerCustomPaymentTerms.id, termId),
-        eq(sellerCustomPaymentTerms.sellerId, sellerId)
-      ))
-      .limit(1);
+    const term = await sql`
+      SELECT id, name FROM seller_custom_payment_terms
+      WHERE id = ${termId} AND "sellerId" = ${sellerId}
+      LIMIT 1
+    `;
 
     if (term.length === 0) {
       return NextResponse.json(
@@ -191,10 +164,7 @@ export async function DELETE(request: NextRequest) {
 
     // Check if this term is being used by any products
     if (!force) {
-      const { neon } = await import('@neondatabase/serverless');
-      const sqlQuery = neon(process.env.DATABASE_URL!);
-      
-      const usageCheck = await sqlQuery`
+      const usageCheck = await sql`
         SELECT COUNT(*) as usage_count
         FROM products 
         WHERE payment_terms @> ${JSON.stringify([term[0].name])}
@@ -215,14 +185,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Soft delete by setting isActive to false
-    const deletedTerm = await db
-      .update(sellerCustomPaymentTerms)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(and(
-        eq(sellerCustomPaymentTerms.id, termId),
-        eq(sellerCustomPaymentTerms.sellerId, sellerId)
-      ))
-      .returning({ id: sellerCustomPaymentTerms.id });
+    const deletedTerm = await sql`
+      UPDATE seller_custom_payment_terms
+      SET "isActive" = false, "updatedAt" = NOW()
+      WHERE id = ${termId} AND "sellerId" = ${sellerId}
+      RETURNING id
+    `;
 
     return NextResponse.json({
       message: 'Custom payment term deleted successfully',

@@ -273,7 +273,9 @@ export default function UserProfilePage() {
                 name: selectedProduct.name,
                 price: selectedProduct.price,
                 unit: selectedProduct.unit,
-                image: selectedProduct.imageUrl
+                image: selectedProduct.imageUrl,
+                sellerId: userProfile.id,
+                availableQuantity: selectedProduct.availableQuantity || '0'
               }}
               currentUser={currentUser}
             />

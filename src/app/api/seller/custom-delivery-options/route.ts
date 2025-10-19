@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sellerCustomDeliveryOptions, users } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { sql } from '@/lib/db';
 import jwt from 'jsonwebtoken';
 
 // Helper function to verify JWT token
@@ -63,21 +61,13 @@ export async function GET(request: NextRequest) {
     
     console.log('🔍 Custom delivery options API - Fetching options for seller:', sellerId);
 
-    const customOptions = await db
-      .select({
-        id: sellerCustomDeliveryOptions.id,
-        name: sellerCustomDeliveryOptions.name,
-        description: sellerCustomDeliveryOptions.description,
-        isActive: sellerCustomDeliveryOptions.isActive,
-        createdAt: sellerCustomDeliveryOptions.createdAt,
-        updatedAt: sellerCustomDeliveryOptions.updatedAt,
-      })
-      .from(sellerCustomDeliveryOptions)
-      .where(and(
-        eq(sellerCustomDeliveryOptions.sellerId, sellerId),
-        eq(sellerCustomDeliveryOptions.isActive, true)
-      ))
-      .orderBy(sellerCustomDeliveryOptions.createdAt);
+    // Use raw SQL query instead of Drizzle ORM
+    const customOptions = await sql`
+      SELECT id, name, "isActive", "createdAt", "updatedAt"
+      FROM seller_custom_delivery_options
+      WHERE "sellerId" = ${sellerId} AND "isActive" = true
+      ORDER BY "createdAt"
+    `;
 
     console.log('📦 Custom delivery options API - Found options:', customOptions.length);
 
@@ -121,7 +111,7 @@ export async function POST(request: NextRequest) {
     const sellerId = decoded.userId;
     
     const body = await request.json();
-    const { name, description } = body;
+    const { name } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -131,14 +121,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if option already exists for this seller
-    const existingOption = await db
-      .select({ id: sellerCustomDeliveryOptions.id })
-      .from(sellerCustomDeliveryOptions)
-      .where(and(
-        eq(sellerCustomDeliveryOptions.sellerId, sellerId),
-        eq(sellerCustomDeliveryOptions.name, name.trim())
-      ))
-      .limit(1);
+    const existingOption = await sql`
+      SELECT id FROM seller_custom_delivery_options
+      WHERE "sellerId" = ${sellerId} AND name = ${name.trim()}
+      LIMIT 1
+    `;
 
     if (existingOption.length > 0) {
       return NextResponse.json(
@@ -148,19 +135,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new custom option
-    const newOption = await db
-      .insert(sellerCustomDeliveryOptions)
-      .values({
-        sellerId,
-        name: name.trim(),
-        description: description?.trim() || null,
-        isActive: true,
-      })
-      .returning({
-        id: sellerCustomDeliveryOptions.id,
-        name: sellerCustomDeliveryOptions.name,
-        description: sellerCustomDeliveryOptions.description,
-      });
+    const newOption = await sql`
+      INSERT INTO seller_custom_delivery_options ("sellerId", name, "isActive")
+      VALUES (${sellerId}, ${name.trim()}, true)
+      RETURNING id, name
+    `;
 
     return NextResponse.json({
       message: 'Custom delivery option created successfully',
@@ -193,14 +172,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Soft delete by setting isActive to false
-    const deletedOption = await db
-      .update(sellerCustomDeliveryOptions)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(and(
-        eq(sellerCustomDeliveryOptions.id, optionId),
-        eq(sellerCustomDeliveryOptions.sellerId, sellerId)
-      ))
-      .returning({ id: sellerCustomDeliveryOptions.id });
+    const deletedOption = await sql`
+      UPDATE seller_custom_delivery_options
+      SET "isActive" = false, "updatedAt" = NOW()
+      WHERE id = ${optionId} AND "sellerId" = ${sellerId}
+      RETURNING id
+    `;
 
     if (deletedOption.length === 0) {
       return NextResponse.json(

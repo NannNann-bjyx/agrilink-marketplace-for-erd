@@ -97,7 +97,11 @@ export function BuyerDashboard({
   }, [savedProducts]);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US').format(price) + ' MMK';
+    // Format price with proper Myanmar currency formatting
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(price) + ' MMK';
   };
 
 

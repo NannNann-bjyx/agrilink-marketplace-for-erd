@@ -261,7 +261,9 @@ export default function SellerStorefrontPage() {
                 name: selectedProduct.name,
                 price: selectedProduct.price,
                 unit: selectedProduct.unit,
-                image: selectedProduct.imageUrl
+                image: selectedProduct.imageUrl,
+                sellerId: seller.id,
+                availableQuantity: selectedProduct.availableQuantity || '0'
               }}
               currentUser={user}
             />

@@ -174,13 +174,13 @@ export async function GET(request: NextRequest) {
           .where(inArray(deliveryOptionsTable.id, product.deliveryOptions));
         
         // Get custom delivery options for this seller
-        const customDeliveryResults = await db
-          .select({ name: sellerCustomDeliveryOptions.name })
-          .from(sellerCustomDeliveryOptions)
-          .where(inArray(sellerCustomDeliveryOptions.id, product.deliveryOptions));
+        const customDeliveryResults = await sql`
+          SELECT name FROM seller_custom_delivery_options
+          WHERE id = ANY(${product.deliveryOptions})
+        `;
         
-        // Combine both results
-        deliveryOptionNames = [...standardDeliveryResults.map(r => r.name), ...customDeliveryResults.map(r => r.name)];
+        // Combine both results - ensure customDeliveryResults is an array
+        deliveryOptionNames = [...standardDeliveryResults.map(r => r.name), ...(Array.isArray(customDeliveryResults) ? customDeliveryResults.map(r => r.name) : [])];
       }
 
       // Resolve payment terms
@@ -193,13 +193,13 @@ export async function GET(request: NextRequest) {
           .where(inArray(paymentTermsTable.id, product.paymentTerms));
         
         // Get custom payment terms for this seller
-        const customPaymentResults = await db
-          .select({ name: sellerCustomPaymentTerms.name })
-          .from(sellerCustomPaymentTerms)
-          .where(inArray(sellerCustomPaymentTerms.id, product.paymentTerms));
+        const customPaymentResults = await sql`
+          SELECT name FROM seller_custom_payment_terms
+          WHERE id = ANY(${product.paymentTerms})
+        `;
         
-        // Combine both results
-        paymentTermNames = [...standardPaymentResults.map(r => r.name), ...customPaymentResults.map(r => r.name)];
+        // Combine both results - ensure customPaymentResults is an array
+        paymentTermNames = [...standardPaymentResults.map(r => r.name), ...(Array.isArray(customPaymentResults) ? customPaymentResults.map(r => r.name) : [])];
       }
 
       return {
@@ -428,19 +428,16 @@ export async function POST(request: NextRequest) {
         .where(inArray(deliveryOptionsTable.name, deliveryArray));
       
       // Look up custom delivery options for this seller
-      const customDeliveryResults = await db
-        .select({ id: sellerCustomDeliveryOptions.id, name: sellerCustomDeliveryOptions.name })
-        .from(sellerCustomDeliveryOptions)
-        .where(and(
-          eq(sellerCustomDeliveryOptions.sellerId, userId),
-          inArray(sellerCustomDeliveryOptions.name, deliveryArray)
-        ));
+      const customDeliveryResults = await sql`
+        SELECT id, name FROM seller_custom_delivery_options
+        WHERE "sellerId" = ${userId} AND name = ANY(${deliveryArray})
+      `;
       
       console.log('🔍 Standard delivery options found:', standardDeliveryResults);
       console.log('🔍 Custom delivery options found:', customDeliveryResults);
       
-      // Combine both results
-      const allDeliveryResults = [...standardDeliveryResults, ...customDeliveryResults];
+      // Combine both results - ensure customDeliveryResults is an array
+      const allDeliveryResults = [...standardDeliveryResults, ...(Array.isArray(customDeliveryResults) ? customDeliveryResults : [])];
       
       if (allDeliveryResults.length > 0) {
         deliveryOptionIds = allDeliveryResults.map(r => r.id);
@@ -461,19 +458,16 @@ export async function POST(request: NextRequest) {
         .where(inArray(paymentTermsTable.name, paymentArray));
       
       // Look up custom payment terms for this seller
-      const customPaymentResults = await db
-        .select({ id: sellerCustomPaymentTerms.id, name: sellerCustomPaymentTerms.name })
-        .from(sellerCustomPaymentTerms)
-        .where(and(
-          eq(sellerCustomPaymentTerms.sellerId, userId),
-          inArray(sellerCustomPaymentTerms.name, paymentArray)
-        ));
+      const customPaymentResults = await sql`
+        SELECT id, name FROM seller_custom_payment_terms
+        WHERE "sellerId" = ${userId} AND name = ANY(${paymentArray})
+      `;
       
       console.log('🔍 Standard payment terms found:', standardPaymentResults);
       console.log('🔍 Custom payment terms found:', customPaymentResults);
       
-      // Combine both results
-      const allPaymentResults = [...standardPaymentResults, ...customPaymentResults];
+      // Combine both results - ensure customPaymentResults is an array
+      const allPaymentResults = [...standardPaymentResults, ...(Array.isArray(customPaymentResults) ? customPaymentResults : [])];
       
       if (allPaymentResults.length > 0) {
         paymentTermIds = allPaymentResults.map(r => r.id);

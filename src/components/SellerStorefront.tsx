@@ -312,7 +312,11 @@ export function SellerStorefront({
     );
   }
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US').format(price);
+    // Format price with proper Myanmar currency formatting
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(price);
   };
 
   // Ensure products is always an array

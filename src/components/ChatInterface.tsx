@@ -1081,8 +1081,8 @@ export function ChatInterface({
         product={{
           id: productId,
           name: productName,
-          price: 0, // We don't have product price in this context, could be passed as prop
-          unit: 'kg', // Default unit, could be passed as prop
+          price: product?.price || 0,
+          unit: product?.unit || 'kg',
           category: 'Agricultural' // Default category, could be passed as prop
         }}
         seller={{
