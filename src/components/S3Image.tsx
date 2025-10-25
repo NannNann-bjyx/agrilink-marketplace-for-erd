@@ -54,7 +54,7 @@ export function S3Image({ src, alt, className, fallback }: S3ImageProps) {
         console.log('🖼️ Using CloudFront URL for:', src);
         
         // Use CloudFront URL instead of generating presigned URL
-        const cloudFrontDomain = process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net';
+        const cloudFrontDomain = (process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net').trim();
         const cloudFrontUrl = `https://${cloudFrontDomain}/${src}`;
         console.log('🖼️ Generated CloudFront URL:', cloudFrontUrl);
         
