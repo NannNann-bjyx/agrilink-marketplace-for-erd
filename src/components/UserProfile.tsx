@@ -268,7 +268,7 @@ export function UserProfile({
                       <User className="w-16 h-16 text-primary" />
                     )}
                   </div>
-                  {isOwnProfile && !previewMode && (
+                  {isOwnProfile && !previewMode && userProfile.userType !== 'buyer' && (
                     <Button
                       size="sm"
                       variant="secondary"

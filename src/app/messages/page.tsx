@@ -27,10 +27,8 @@ import {
 
 // Helper function to get verification level for other party (public view only)
 function getOtherPartyVerificationLevel(otherParty: any): string {
-  // Check if user is verified
-  const isVerified = otherParty.verified || otherParty.phoneVerified || 
-                    otherParty.verificationStatus === 'id-verified' || 
-                    otherParty.verificationStatus === 'business-verified';
+  // Only consider fully verified users (not just phone verified)
+  const isVerified = otherParty.verified;
   
   if (!isVerified) {
     return 'unverified';

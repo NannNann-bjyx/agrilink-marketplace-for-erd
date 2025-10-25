@@ -139,9 +139,14 @@ export async function GET(request: NextRequest) {
       // Determine verification status
       let verificationStatus = 'unverified';
       if (conv.otherPartyVerification?.verified) {
-        verificationStatus = 'verified';
+        // Check account type to determine the appropriate verification level
+        if (conv.otherPartyData?.accountType === 'business') {
+          verificationStatus = 'business-verified';
+        } else {
+          verificationStatus = 'id-verified';
+        }
       } else if (conv.otherPartyVerification?.verificationSubmitted) {
-        verificationStatus = 'pending';
+        verificationStatus = 'under-review';
       }
 
       return {

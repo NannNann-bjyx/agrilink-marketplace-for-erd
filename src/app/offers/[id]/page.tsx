@@ -363,15 +363,7 @@ export default function OfferDetailsPage() {
 
   const isBuyer = user.id === offer.buyerId;
   const isSeller = user.id === offer.sellerId;
-  const otherParty = isBuyer ? {
-    id: offer.sellerId,
-    name: offer.sellerName,
-    email: offer.sellerEmail,
-    userType: offer.sellerUserType || 'seller',
-    accountType: offer.sellerAccountType || 'individual',
-    verificationLevel: offer.sellerVerificationLevel || offer.seller?.verificationLevel || 'unverified',
-    image: offer.seller?.profileImage || offer.sellerImage
-  } : {
+  const otherParty = isSeller ? {
     id: offer.buyerId,
     name: offer.buyerName,
     email: offer.buyerEmail,
@@ -379,7 +371,16 @@ export default function OfferDetailsPage() {
     accountType: offer.buyerAccountType || 'individual',
     verificationLevel: offer.buyerVerificationLevel || offer.buyer?.verificationLevel || 'unverified',
     image: offer.buyer?.profileImage || offer.buyerImage
+  } : {
+    id: offer.sellerId,
+    name: offer.sellerName,
+    email: offer.sellerEmail,
+    userType: offer.sellerUserType || 'seller',
+    accountType: offer.sellerAccountType || 'individual',
+    verificationLevel: offer.sellerVerificationLevel || offer.seller?.verificationLevel || 'unverified',
+    image: offer.seller?.profileImage || offer.sellerImage
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -618,7 +619,7 @@ export default function OfferDetailsPage() {
                         size="sm"
                       />
                       <PublicVerificationStatus 
-                        verificationLevel={otherParty.verificationLevel === 'id-verified' || otherParty.verificationLevel === 'business-verified' ? 'id-verified' : 'unverified'}
+                        verificationLevel={otherParty.verificationLevel || 'unverified'}
                         size="xs"
                       />
                     </div>

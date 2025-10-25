@@ -321,14 +321,24 @@ export async function GET(
         buyer.email as "buyerEmail",
         buyer."userType" as "buyerType",
         buyer."accountType" as "buyerAccountType",
-        COALESCE(buyer_ver."verificationStatus", 'unverified') as "buyerVerificationLevel",
+        CASE 
+          WHEN buyer_ver.verified = true AND buyer."accountType" = 'business' THEN 'business-verified'
+          WHEN buyer_ver.verified = true AND buyer."accountType" = 'individual' THEN 'id-verified'
+          WHEN buyer_ver."verificationStatus" = 'under-review' THEN 'under-review'
+          ELSE 'unverified'
+        END as "buyerVerificationLevel",
         buyer_profile."profileImage" as "buyerImage",
         seller.id as "sellerId",
         seller.name as "sellerName",
         seller.email as "sellerEmail",
         seller."userType" as "sellerType",
         seller."accountType" as "sellerAccountType",
-        COALESCE(seller_ver."verificationStatus", 'unverified') as "sellerVerificationLevel",
+        CASE 
+          WHEN seller_ver.verified = true AND seller."accountType" = 'business' THEN 'business-verified'
+          WHEN seller_ver.verified = true AND seller."accountType" = 'individual' THEN 'id-verified'
+          WHEN seller_ver."verificationStatus" = 'under-review' THEN 'under-review'
+          ELSE 'unverified'
+        END as "sellerVerificationLevel",
         seller_profile."profileImage" as "sellerImage"
       FROM offers o
       INNER JOIN products p ON o."productId" = p.id
