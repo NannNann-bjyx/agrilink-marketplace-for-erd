@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "./ui/alert";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { S3Image } from './S3Image';
+import { getDocumentUrl } from '@/lib/cloudfront-utils';
 import { Separator } from './ui/separator';
 import { 
   CheckCircle, 
@@ -111,21 +112,11 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
     try {
       // Check if it's an S3 key (doesn't start with 'data:' or 'http')
       if (!documentData.startsWith('data:') && !documentData.startsWith('http')) {
-        // S3 key format - generate presigned URL
-        const response = await fetch('/api/s3/generate-url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ s3Key: documentData }),
-        });
+        // S3 key format - use server-side proxy to avoid CORS issues
+        console.log('🔍 Using server-side proxy for viewing S3 key:', documentData);
         
-        if (!response.ok) {
-          throw new Error('Failed to generate presigned URL');
-        }
-        
-        const data = await response.json();
-        const presignedUrl = data.presignedUrl;
+        // Generate a server-side URL for viewing
+        const viewUrl = `/api/s3/view?key=${encodeURIComponent(documentData)}`;
         
         // Determine file type from S3 key
         const fileExtension = documentData.split('.').pop()?.toLowerCase();
@@ -133,7 +124,7 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
         
         setPreviewDocument({
           name: documentName,
-          data: presignedUrl,
+          data: viewUrl,
           type: isImage ? 'image' : 'document'
         });
         setShowDocumentPreview(true);
@@ -905,7 +896,7 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
             
             <div className="mt-4">
               {previewDocument.type === 'image' ? (
-                <img 
+                <S3Image 
                   src={previewDocument.data} 
                   alt={previewDocument.name}
                   className="max-w-full h-auto mx-auto"

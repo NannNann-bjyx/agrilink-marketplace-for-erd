@@ -25,6 +25,12 @@ export function S3Image({ src, alt, className, fallback }: S3ImageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Immediately update imageUrl when src changes to prevent showing old image
+  useEffect(() => {
+    setImageUrl(src);
+    setHasError(false);
+  }, [src]);
+
   useEffect(() => {
     const loadImage = async () => {
       console.log('🖼️ S3Image loading:', { src, isS3Key: isS3Key(src) });

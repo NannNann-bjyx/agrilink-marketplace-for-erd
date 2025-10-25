@@ -150,11 +150,25 @@ export default function ProfilePage() {
         }
       });
 
+      // Add S3 keys from API response for image updates
+      if (result.user.profileImage) {
+        frontendUpdates.profileImage = result.user.profileImage;
+        console.log('🖼️ Adding profileImage S3 key to frontendUpdates:', result.user.profileImage);
+      }
+      if (result.user.storefrontImage) {
+        frontendUpdates.storefrontImage = result.user.storefrontImage;
+        console.log('🖼️ Adding storefrontImage S3 key to frontendUpdates:', result.user.storefrontImage);
+      }
+
       // Update user data in localStorage with frontend field names
       const updatedUser = { ...user, ...frontendUpdates };
       console.log('🔄 Updating user state with:', frontendUpdates);
+      console.log('🔄 Updated user profileImage:', updatedUser.profileImage);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       setUser(updatedUser);
+      
+      // Return the API result so components can access S3 keys
+      return result;
       
     } catch (error) {
       console.error("Failed to update user:", error);

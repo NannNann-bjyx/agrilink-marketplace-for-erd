@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { S3Image } from './S3Image';
+import { S3Image, clearS3ImageCache } from './S3Image';
 import { useState, useRef, useEffect } from "react";
 import { 
   User, 
@@ -178,14 +178,6 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
 
   // Update formData when user prop changes, but only if we're not currently editing
   useEffect(() => {
-    console.log('🔄 Profile component - user prop changed:', {
-      phone: user.phone,
-      location: user.location,
-      name: user.name,
-      businessName: user.businessName,
-      isEditing: !!editing
-    });
-    
     // Only update formData if we're not currently editing a field
     // This prevents race conditions where user updates are overridden
     if (!editing) {
@@ -197,25 +189,7 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
         region: user.region || '',
         businessName: user.businessName || '',
       });
-      
-      console.log('✅ Profile component - formData updated with:', {
-        phone: user.phone || '',
-        location: user.location || '',
-        name: user.name || '',
-        businessName: user.businessName || ''
-      });
-    } else {
-      console.log('⏸️ Profile component - Skipping formData update because editing:', editing.field);
     }
-    
-    // Debug: Log business details specifically
-    console.log('🏪 Profile component - Business details from user:', {
-      businessName: user.businessName,
-      businessDescription: user.businessDescription,
-      businessLicenseNumber: user.businessLicenseNumber,
-      businessNameType: typeof user.businessName,
-      allUserKeys: Object.keys(user)
-    });
   }, [user, editing]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -272,8 +246,21 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
       });
       
       if (onUpdate) {
-        await onUpdate({ profileImage: dataUrl });
-        setFormData(prev => ({ ...prev, profileImage: dataUrl }));
+        const result = await onUpdate({ profileImage: dataUrl });
+        // Use the S3 key returned from API, fallback to dataUrl if not available
+        const imageKey = result?.user?.profileImage || result?.profileImage || dataUrl;
+        console.log('🖼️ Profile component - Image upload result:', result);
+        console.log('🖼️ Profile component - Extracted imageKey:', imageKey);
+        
+        // Clear S3Image cache to force reload of new image
+        clearS3ImageCache();
+        
+        // Directly update formData with the S3 key (like storefront does)
+        setFormData(prev => ({
+          ...prev,
+          profileImage: imageKey
+        }));
+        
         setImageSuccess('✅ Profile image updated successfully!');
         setTimeout(() => setImageSuccess(''), 5000);
       }
@@ -286,6 +273,7 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
       setImageUploading(false);
     }
   };
+
 
   const startEditing = (field: string, currentValue: string) => {
     setEditing({ field, value: currentValue });
@@ -418,6 +406,7 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
                 <div className="relative group">
                   {formData.profileImage ? (
                     <S3Image
+                      key={formData.profileImage} // Force re-render when image changes
                       src={formData.profileImage}
                       alt={`${formData.name}'s profile picture`}
                       className="w-28 h-28 rounded-full object-cover border-4 border-border shadow-lg"

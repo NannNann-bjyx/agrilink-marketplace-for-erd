@@ -1,22 +1,10 @@
-// Utility to get fresh S3 URLs
-export async function getS3Url(s3Key: string): Promise<string> {
+// Utility to get CloudFront URLs (replaces presigned URLs)
+export function getS3Url(s3Key: string): string {
   try {
-    const response = await fetch('/api/s3/generate-url', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ s3Key }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to generate URL');
-    }
-    
-    const data = await response.json();
-    return data.presignedUrl;
+    const cloudFrontDomain = (process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net').trim();
+    return `https://${cloudFrontDomain}/${s3Key}`;
   } catch (error) {
-    console.error('Failed to get S3 URL:', error);
+    console.error('Failed to get CloudFront URL:', error);
     // Fallback to placeholder image
     return '/api/placeholder/400/300?text=Image+Not+Available';
   }

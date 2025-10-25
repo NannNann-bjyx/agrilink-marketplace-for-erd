@@ -142,10 +142,10 @@ export default function SellerStorefrontPage() {
           const responseData = await response.json();
           console.log('✅ API Response:', responseData);
 
-          // Update local state
+          // Update local state with the S3 key returned from API
           setSeller(prev => ({
             ...prev,
-            storefrontImage: dataUrl
+            storefrontImage: responseData.user?.storefrontImage || responseData.storefrontImage || dataUrl
           }));
 
           setImageMessage({ type: 'success', text: 'Storefront image updated successfully!' });

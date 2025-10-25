@@ -4,6 +4,7 @@ import { Badge } from "./ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { PhoneVerification } from "./PhoneVerification";
 import { S3Image } from './S3Image';
+import { getDocumentUrl } from '@/lib/cloudfront-utils';
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -452,30 +453,14 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       setShowDocumentPreview(false); // Hide previous preview
       console.log('🔍 Modal state after setting:', { showDocumentPreview: false, isGeneratingPreview: true });
 
-      // Handle S3 key (new format)
+      // Handle S3 key (new format) - use CloudFront URL
       if (!documentData.startsWith('data:') && !documentData.startsWith('/uploads/') && !documentData.startsWith('http') && !documentData.startsWith('blob:')) {
-        // S3 key format - generate presigned URL
         try {
-          console.log('🔄 Generating S3 URL for:', documentData);
-          const response = await fetch('/api/s3/generate-url', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ s3Key: documentData }),
-          });
+          console.log('🔄 Getting CloudFront URL for S3 key:', documentData);
           
-          console.log('📡 S3 URL response status:', response.status);
-          
-          if (!response.ok) {
-            console.error('❌ Failed to generate S3 URL:', response.status, response.statusText);
-            alert('Unable to generate document URL. Please try again later.');
-            return;
-          }
-          
-          const data = await response.json();
-          const presignedUrl = data.presignedUrl;
-          console.log('✅ Generated presigned URL:', presignedUrl.substring(0, 100) + '...');
+          // Use CloudFront URL instead of generating presigned URL
+          const documentUrl = getDocumentUrl(documentData);
+          console.log('✅ Generated CloudFront URL:', documentUrl.substring(0, 100) + '...');
           
           // Determine file type from S3 key
           const fileExtension = documentData.split('.').pop()?.toLowerCase();
@@ -483,7 +468,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           
           setPreviewDocument({
             name: documentName,
-            data: presignedUrl,
+            data: documentUrl,
             type: isImage ? 'image' : 'document',
             originalData: documentData
           });
@@ -491,8 +476,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           setIsGeneratingPreview(false);
           console.log('🔍 Modal should now be visible:', { showDocumentPreview: true, isGeneratingPreview: false });
           return;
-        } catch (s3Error) {
-          console.error('Error generating S3 URL:', s3Error);
+        } catch (error) {
+          console.error('❌ Error getting CloudFront URL:', error);
           alert('Failed to load document from storage');
           setIsGeneratingPreview(false);
           return;

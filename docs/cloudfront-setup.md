@@ -1,13 +1,15 @@
 # CloudFront CDN Setup Guide
 
 ## Overview
-This guide shows how to add AWS CloudFront CDN to your S3 image storage for better global performance.
+This guide shows how to set up AWS CloudFront CDN for your S3 image storage in the AgriLink marketplace. CloudFront provides better global performance, reduced costs, and improved user experience.
 
 ## Benefits
-- **Faster Loading**: Images served from nearest edge location
-- **Reduced S3 Costs**: Fewer direct S3 requests
-- **Better Caching**: Automatic cache management
+- **Faster Loading**: Images served from nearest edge location (10-50ms vs 200-500ms)
+- **Reduced S3 Costs**: ~80% savings on request costs
+- **Better Caching**: Automatic cache management with 1-day default TTL
 - **Global Performance**: Users worldwide get fast access
+- **No Presigned URLs**: Direct CloudFront URLs eliminate API calls for viewing
+- **Better Security**: HTTPS-only delivery with Origin Access Control
 
 ## Setup Steps
 
@@ -37,83 +39,54 @@ This guide shows how to add AWS CloudFront CDN to your S3 image storage for bett
 - Alternate Domain Names: (optional) `images.yourapp.com`
 - SSL Certificate: "Default CloudFront Certificate"
 
-### 2. Update S3 Bucket Policy
+### 2. S3 Bucket Policy (Not Required)
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AllowCloudFrontServicePrincipal",
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "cloudfront.amazonaws.com"
-      },
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::your-bucket-name/*",
-      "Condition": {
-        "StringEquals": {
-          "AWS:SourceArn": "arn:aws:cloudfront::account-id:distribution/distribution-id"
-        }
-      }
-    }
-  ]
-}
-```
+**Note**: With Origin Access Control (OAC), you don't need to manually update the S3 bucket policy. CloudFront automatically manages the necessary permissions when you create the OAC and attach it to your distribution.
+
+The OAC handles the authentication between CloudFront and S3, making the manual policy update unnecessary.
 
 ### 3. Update Your Code
 
 #### Environment Variables
 ```bash
 # Add to .env.local
-AWS_CLOUDFRONT_DOMAIN=your-distribution-id.cloudfront.net
+NEXT_PUBLIC_CLOUDFRONT_DOMAIN=d1dnr245ff3v1m.cloudfront.net
 ```
 
-#### Update S3 Upload Service
+#### Current Implementation
+Our CloudFront integration is already implemented with the following components:
+
+**CloudFront Utils** (`src/lib/cloudfront-utils.ts`):
 ```typescript
-// src/lib/s3-upload.ts
-export class S3UploadService {
-  private cloudfrontDomain: string;
-
-  constructor() {
-    this.cloudfrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN || '';
+export function getDocumentUrl(s3Key: string): string {
+  const cloudFrontDomain = (process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net').trim();
+  if (!cloudFrontDomain) {
+    console.error('NEXT_PUBLIC_CLOUDFRONT_DOMAIN is not set.');
+    return `/api/placeholder/400/300?text=CDN+Error`; 
   }
-
-  // Generate CDN URL instead of presigned URL
-  generateCdnUrl(s3Key: string): string {
-    if (this.cloudfrontDomain) {
-      return `https://${this.cloudfrontDomain}/${s3Key}`;
-    }
-    // Fallback to presigned URL
-    return this.generatePresignedUrl(s3Key);
-  }
+  return `https://${cloudFrontDomain}/${s3Key}`;
 }
 ```
 
-#### Update Image Components
+**S3Image Component** (`src/components/S3Image.tsx`):
 ```typescript
-// src/components/S3Image.tsx
-export function S3Image({ src, alt, className, fallback }: S3ImageProps) {
-  const [imageUrl, setImageUrl] = useState<string>(src);
+// Automatically uses CloudFront URLs for S3 keys
+const cloudFrontDomain = (process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net').trim();
+const cloudFrontUrl = `https://${cloudFrontDomain}/${src}`;
+```
 
-  useEffect(() => {
-    const loadImage = async () => {
-      if (!isS3Key(src)) {
-        setImageUrl(src);
-        return;
-      }
-
-      // Use CDN URL directly (no API call needed!)
-      const cdnUrl = `https://${process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN}/${src}`;
-      setImageUrl(cdnUrl);
-    };
-
-    loadImage();
-  }, [src]);
-
-  return <img src={imageUrl} alt={alt} className={className} />;
+**S3 Utils** (`src/lib/s3-utils.ts`):
+```typescript
+export function getS3Url(s3Key: string): string {
+  const cloudFrontDomain = (process.env.NEXT_PUBLIC_CLOUDFRONT_DOMAIN || 'd1234567890.cloudfront.net').trim();
+  return `https://${cloudFrontDomain}/${s3Key}`;
 }
 ```
+
+#### Server-Side Proxies
+For admin panel downloads and viewing (to avoid CORS issues):
+- **Download**: `/api/s3/download` - Downloads files to user's device
+- **View**: `/api/s3/view` - Displays files in browser modal
 
 ## Performance Comparison
 
