@@ -69,6 +69,7 @@ export const useChat = () => {
       const data = await response.json()
       setConversations(data.conversations || [])
       console.log('✅ Conversations loaded:', data.conversations?.length || 0)
+      console.log('📊 Unread counts:', data.conversations?.map((c: any) => ({ id: c.id, unreadCount: c.unreadCount })) || [])
       
     } catch (err) {
       console.error('❌ Failed to load conversations:', err)

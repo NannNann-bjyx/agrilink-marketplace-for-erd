@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState } from 'react';
+import { S3Image } from './S3Image';
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -258,7 +259,7 @@ export function UserProfile({
                 <div className="relative group">
                   <div className="w-full h-48 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden">
                     {userProfile.profileImage ? (
-                      <img 
+                      <S3Image 
                         src={userProfile.profileImage} 
                         alt={userProfile.name}
                         className="w-full h-full object-cover rounded-lg"
@@ -710,7 +711,7 @@ export function UserProfile({
                       <div className="flex gap-3">
                         <div className="w-16 h-16 bg-muted rounded-lg flex-shrink-0">
                           {product.imageUrl ? (
-                            <img 
+                            <S3Image 
                               src={product.imageUrl} 
                               alt={product.name}
                               className="w-full h-full object-cover rounded-lg"

@@ -8,6 +8,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Card, CardContent } from "./ui/card";
+import { S3Image } from './S3Image';
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { 
@@ -457,7 +458,7 @@ export function SimpleOfferModal({
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     {productData?.imageUrl ? (
-                      <img 
+                      <S3Image 
                         src={productData.imageUrl} 
                         alt={productData.name}
                         className="w-full h-full object-cover"

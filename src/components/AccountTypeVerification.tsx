@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { PhoneVerification } from "./PhoneVerification";
+import { S3Image } from './S3Image';
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -83,10 +84,10 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       const userDocs = (currentUser as any).verificationDocuments;
       
       // Restore ID Card - check if it's an object with status
-      if (userDocs.idCard && typeof userDocs.idCard === 'object' && userDocs.idCard.status && userDocs.idCard.status !== 'pending') {
+      if (userDocs.idCard && typeof userDocs.idCard === 'object' && userDocs.idCard.status) {
         documents.idCard = {
           file: null,
-          url: userDocs.idCard.data || '', // Use data field for preview
+          url: userDocs.idCard.data || '', // This should be S3 key, not blob URL
           name: userDocs.idCard.name || 'ID Card Document',
           verified: userDocs.idCard.status === 'verified',
           status: userDocs.idCard.status
@@ -94,10 +95,10 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       }
       
       // Restore Business License - check if it's an object with status
-      if (userDocs.businessLicense && typeof userDocs.businessLicense === 'object' && userDocs.businessLicense.status && userDocs.businessLicense.status !== 'pending') {
+      if (userDocs.businessLicense && typeof userDocs.businessLicense === 'object' && userDocs.businessLicense.status) {
         documents.businessLicense = {
           file: null,
-          url: userDocs.businessLicense.data || '', // Use data field for preview
+          url: userDocs.businessLicense.data || '', // This should be S3 key, not blob URL
           name: userDocs.businessLicense.name || 'Business License Document',
           verified: userDocs.businessLicense.status === 'verified',
           status: userDocs.businessLicense.status
@@ -109,19 +110,28 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
   
   // Track upload status to prevent duplicate uploads
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Track verification request submission status
   const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(false);
 
+
   // Sync uploadedDocuments state when currentUser.verificationDocuments changes
   useEffect(() => {
     const userDocs = (currentUser as any).verificationDocuments;
-    console.log('🔄 Document sync useEffect triggered:', { userDocs, agriLinkVerificationRequested });
+    
+    console.log('🔍 AccountTypeVerification - User verification documents:', {
+      userDocs,
+      userDocsType: typeof userDocs,
+      userDocsStringified: JSON.stringify(userDocs, null, 2),
+      currentUserVerified: currentUser.verified,
+      currentUserVerificationStatus: currentUser.verificationStatus
+    });
     
     // If verification documents are null (after reset), clear the local state
     if (!userDocs) {
-      console.log('📝 No user documents found, clearing local state');
+      console.log('🔍 No verification documents found, clearing local state');
       setUploadedDocuments({});
       return;
     }
@@ -130,8 +140,16 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
     setUploadedDocuments(prev => {
       const updated = { ...prev };
       
+      console.log('🔍 Processing verification documents:', {
+        idCard: userDocs.idCard,
+        businessLicense: userDocs.businessLicense,
+        idCardType: typeof userDocs.idCard,
+        businessLicenseType: typeof userDocs.businessLicense
+      });
+      
       // Sync ID Card status
-      if (userDocs.idCard && typeof userDocs.idCard === 'object' && userDocs.idCard.status && userDocs.idCard.status !== 'pending') {
+      if (userDocs.idCard && typeof userDocs.idCard === 'object' && userDocs.idCard.status) {
+        console.log('🔍 Syncing ID Card:', userDocs.idCard);
         updated.idCard = {
           file: null,
           url: userDocs.idCard.data || '', // Use data field for preview
@@ -142,7 +160,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       }
       
       // Sync Business License status  
-      if (userDocs.businessLicense && typeof userDocs.businessLicense === 'object' && userDocs.businessLicense.status && userDocs.businessLicense.status !== 'pending') {
+      if (userDocs.businessLicense && typeof userDocs.businessLicense === 'object' && userDocs.businessLicense.status) {
+        console.log('🔍 Syncing Business License:', userDocs.businessLicense);
         updated.businessLicense = {
           file: null,
           url: userDocs.businessLicense.data || '', // Use data field for preview
@@ -152,6 +171,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
         };
       }
       
+      console.log('🔍 Updated uploadedDocuments:', updated);
       return updated;
     });
   }, [(currentUser as any).verificationDocuments]);
@@ -313,6 +333,26 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
     type: string;
     originalData?: string;
   } | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+
+  // Debug: Track showDocumentPreview changes
+  useEffect(() => {
+    console.log('🔍 showDocumentPreview changed:', showDocumentPreview);
+  }, [showDocumentPreview]);
+
+  // Debug: Track isGeneratingPreview changes
+  useEffect(() => {
+    console.log('🔍 isGeneratingPreview changed:', isGeneratingPreview);
+  }, [isGeneratingPreview]);
+
+  // Debug: Track when modal should render
+  useEffect(() => {
+    const shouldShow = showDocumentPreview || isGeneratingPreview;
+    console.log('🔍 Modal should render effect:', { showDocumentPreview, isGeneratingPreview, shouldShow });
+    if (shouldShow) {
+      console.log('🔍 Modal should be visible NOW!');
+    }
+  }, [showDocumentPreview, isGeneratingPreview]);
   
   // Rejection review state
   const [showRejectionReview, setShowRejectionReview] = useState(false);
@@ -333,15 +373,15 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
     // If user is rejected or not verified, documents should show as "Required" even if visible
     if (currentUser.verified) {
       // User is verified - documents are complete
-      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status === 'uploaded') || uploadedDocuments.idCard;
+      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status && userDocs.idCard.status !== 'pending') || uploadedDocuments.idCard;
       return { hasIdCard, hasBusinessLicense: false, isComplete: true };
     } else if (currentUser.verificationStatus === 'rejected') {
       // User was rejected - show documents as complete if uploaded for resubmission
-      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status === 'uploaded') || uploadedDocuments.idCard;
+      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status && userDocs.idCard.status !== 'pending') || uploadedDocuments.idCard;
       return { hasIdCard, hasBusinessLicense: false, isComplete: hasIdCard };
     } else if (agriLinkVerificationRequested) {
       // Verification submitted but not yet approved - documents are complete for submission
-      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status === 'uploaded') || uploadedDocuments.idCard;
+      const hasIdCard = (userDocs?.idCard && userDocs.idCard.status && userDocs.idCard.status !== 'pending') || uploadedDocuments.idCard;
       return { hasIdCard, hasBusinessLicense: false, isComplete: true };
     } else {
       // Not submitted yet - only check local uploaded documents
@@ -366,10 +406,16 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
     // 2. Documents verification - count as complete if documents are uploaded (matches UI logic)
     if (getDocumentCompletionStatus.isComplete) completed++;
     
-    // 3. Business details (only for business accounts) - count as complete if business info is filled
+    // 3. Business details (only for business accounts) - count as complete if business info AND license are filled
     if (isBusinessAccount) {
-      const hasBusinessInfo = Boolean(currentUser.businessName);
-      if (hasBusinessInfo) completed++;
+      const hasBusinessInfo = Boolean(currentUser.businessName && currentUser.businessDescription && currentUser.businessLicenseNumber);
+      const hasBusinessLicense = Boolean(
+        (currentUser.verificationDocuments?.businessLicense && 
+         currentUser.verificationDocuments.businessLicense.status && 
+         currentUser.verificationDocuments.businessLicense.status !== 'pending') ||
+        uploadedDocuments.businessLicense
+      );
+      if (hasBusinessInfo && hasBusinessLicense) completed++;
     }
     
     // 4. AgriLink Verification - count as complete if user is verified by admin
@@ -394,15 +440,84 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
   
   const handleDocumentPreview = async (documentData: string, documentName: string) => {
     try {
+      console.log('🔍 Document preview requested:', { documentName, documentData: documentData?.substring(0, 50) + '...' });
+      console.log('🔍 Current modal state before:', { showDocumentPreview, isGeneratingPreview });
+      
       if (!documentData) {
         alert('No document data available');
         return;
       }
 
-      // Handle file path (new format) or base64 data (legacy format)
+      setIsGeneratingPreview(true);
+      setShowDocumentPreview(false); // Hide previous preview
+      console.log('🔍 Modal state after setting:', { showDocumentPreview: false, isGeneratingPreview: true });
+
+      // Handle S3 key (new format)
+      if (!documentData.startsWith('data:') && !documentData.startsWith('/uploads/') && !documentData.startsWith('http') && !documentData.startsWith('blob:')) {
+        // S3 key format - generate presigned URL
+        try {
+          console.log('🔄 Generating S3 URL for:', documentData);
+          const response = await fetch('/api/s3/generate-url', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ s3Key: documentData }),
+          });
+          
+          console.log('📡 S3 URL response status:', response.status);
+          
+          if (!response.ok) {
+            console.error('❌ Failed to generate S3 URL:', response.status, response.statusText);
+            alert('Unable to generate document URL. Please try again later.');
+            return;
+          }
+          
+          const data = await response.json();
+          const presignedUrl = data.presignedUrl;
+          console.log('✅ Generated presigned URL:', presignedUrl.substring(0, 100) + '...');
+          
+          // Determine file type from S3 key
+          const fileExtension = documentData.split('.').pop()?.toLowerCase();
+          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+          
+          setPreviewDocument({
+            name: documentName,
+            data: presignedUrl,
+            type: isImage ? 'image' : 'document',
+            originalData: documentData
+          });
+          setShowDocumentPreview(true);
+          setIsGeneratingPreview(false);
+          console.log('🔍 Modal should now be visible:', { showDocumentPreview: true, isGeneratingPreview: false });
+          return;
+        } catch (s3Error) {
+          console.error('Error generating S3 URL:', s3Error);
+          alert('Failed to load document from storage');
+          setIsGeneratingPreview(false);
+          return;
+        }
+      }
+      
+      // Handle blob URL (temporary URLs)
+      if (documentData.startsWith('blob:')) {
+        // Blob URL format - use directly
+        setPreviewDocument({
+          name: documentName,
+          data: documentData,
+          type: 'image', // Assume image for blob URLs
+          originalData: documentData
+        });
+        setShowDocumentPreview(true);
+        setIsGeneratingPreview(false);
+        return;
+      }
+      
+      // Handle file path (legacy format)
       if (documentData.startsWith('/uploads/')) {
         // File path format - open directly
         window.open(documentData, '_blank');
+        setIsGeneratingPreview(false);
         return;
       } else if (documentData.startsWith('data:')) {
         // Base64 data format (legacy)
@@ -434,13 +549,17 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           originalData: documentData // Keep original for cleanup
         });
         setShowDocumentPreview(true);
+        setIsGeneratingPreview(false);
       } else {
         alert('Invalid document format');
+        setIsGeneratingPreview(false);
         return;
       }
     } catch (error) {
       console.error('Error preparing document preview:', error);
-      alert('Unable to preview document - invalid format');
+      setUploadError('Unable to preview document - invalid format');
+      setTimeout(() => setUploadError(null), 5000);
+      setIsGeneratingPreview(false);
     }
   };
 
@@ -456,17 +575,20 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
 
     // Validate file size (10MB limit)
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
+      setUploadError('File size must be less than 10MB');
+      setTimeout(() => setUploadError(null), 5000);
       return;
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (JPG, PNG, etc.)');
+      setUploadError('Please upload an image file (JPG, PNG, etc.)');
+      setTimeout(() => setUploadError(null), 5000);
       return;
     }
 
     setIsUploading(true);
+    setUploadError(null);
     try {
       // Create object URL for preview
       const url = URL.createObjectURL(file);
@@ -490,17 +612,17 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       const updatedDocuments = {
         ...(currentUser.verificationDocuments || {}),
         [documentType]: {
-          status: 'uploaded',
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          uploadedAt: new Date().toISOString(),
-          // Store the file as base64 for admin download
-          data: await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(file);
-          })
+        status: 'uploaded',
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date().toISOString(),
+        // Convert to base64 for API - API will handle S3 upload
+        data: await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        })
         }
       };
       
@@ -550,6 +672,26 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
         throw new Error(`Failed to update user profile: ${response.status} ${response.statusText}`);
       }
       
+      // Get the response data to update local state with S3 keys
+      const responseData = await response.json();
+      console.log('✅ API Response received:', responseData);
+      
+      // Update local state with S3 keys from API response
+      if (responseData.user?.verificationDocuments?.[documentType]?.data) {
+        const s3Key = responseData.user.verificationDocuments[documentType].data;
+        console.log('🔄 Updating local state with S3 key:', s3Key);
+        
+        setUploadedDocuments(prev => ({
+          ...prev,
+          [documentType]: {
+            ...prev[documentType],
+            url: s3Key, // Replace blob URL with S3 key
+            verified: false,
+            status: 'uploaded'
+          }
+        }));
+      }
+      
       // Small delay to ensure state propagation
       await new Promise(resolve => setTimeout(resolve, 100));
       
@@ -560,7 +702,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Upload failed. Please try again.');
+      setUploadError('Upload failed. Please try again.');
+      setTimeout(() => setUploadError(null), 5000);
     } finally {
       setIsUploading(false);
     }
@@ -633,9 +776,55 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
       
       // Check if documents are uploaded in the database OR locally uploaded
       const userDocs = currentUser.verificationDocuments || {};
-      const hasIdCard = (userDocs.idCard && userDocs.idCard.status === 'uploaded') || uploadedDocuments.idCard;
-      const hasBusinessLicense = !isBusinessAccount || (userDocs.businessLicense && userDocs.businessLicense.status === 'uploaded') || uploadedDocuments.businessLicense;
+      const hasIdCard = (userDocs.idCard && userDocs.idCard.status && userDocs.idCard.status !== 'pending') || uploadedDocuments.idCard;
+      const hasBusinessLicense = !isBusinessAccount || (userDocs.businessLicense && userDocs.businessLicense.status && userDocs.businessLicense.status !== 'pending') || uploadedDocuments.businessLicense;
       const hasUploadedDocs = hasIdCard && hasBusinessLicense;
+      
+      // Prepare verification documents for submission
+      // Use local uploadedDocuments if available, otherwise use database documents
+      const verificationDocsForSubmission: any = {};
+      
+      // Process ID Card
+      if (uploadedDocuments.idCard && uploadedDocuments.idCard.file) {
+        // Use local document (has file object)
+        verificationDocsForSubmission.idCard = {
+          status: 'uploaded',
+          name: uploadedDocuments.idCard.name,
+          size: uploadedDocuments.idCard.file.size,
+          type: uploadedDocuments.idCard.file.type,
+          uploadedAt: new Date().toISOString(),
+          data: await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(uploadedDocuments.idCard.file!);
+          })
+        };
+      } else if (userDocs.idCard && userDocs.idCard.status && userDocs.idCard.status !== 'pending') {
+        // Use database document (might be S3 key or base64)
+        verificationDocsForSubmission.idCard = userDocs.idCard;
+      }
+      
+      // Process Business License (for business accounts)
+      if (isBusinessAccount) {
+        if (uploadedDocuments.businessLicense && uploadedDocuments.businessLicense.file) {
+          // Use local document (has file object)
+          verificationDocsForSubmission.businessLicense = {
+            status: 'uploaded',
+            name: uploadedDocuments.businessLicense.name,
+            size: uploadedDocuments.businessLicense.file.size,
+            type: uploadedDocuments.businessLicense.file.type,
+            uploadedAt: new Date().toISOString(),
+            data: await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(uploadedDocuments.businessLicense.file!);
+            })
+          };
+        } else if (userDocs.businessLicense && userDocs.businessLicense.status && userDocs.businessLicense.status !== 'pending') {
+          // Use database document (might be S3 key or base64)
+          verificationDocsForSubmission.businessLicense = userDocs.businessLicense;
+        }
+      }
       
       // Check phone verification
       const isPhoneVerified = currentUser.phoneVerified === true;
@@ -752,7 +941,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
             requestType: 'agrilink_verification',
             status: 'under_review',
             submittedAt: new Date().toISOString(),
-            verificationDocuments: userDocs,
+            verificationDocuments: verificationDocsForSubmission,
             businessInfo: isBusinessAccount ? {
               business_name: currentUser.businessName,
               business_description: currentUser.businessDescription,
@@ -796,7 +985,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           agriLinkVerificationRequestedAt: new Date().toISOString(),
           verificationStatus: 'under_review',
           verificationSubmittedAt: new Date().toISOString(),
-          verificationDocuments: userDocs
+          verificationDocuments: verificationDocsForSubmission
         };
         
         console.log('📋 User update data:', userUpdateData);
@@ -1007,12 +1196,12 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                       <Badge variant="secondary" className="bg-primary/10 text-primary">
                         Verified
                       </Badge>
-                      {uploadedDocuments.businessLicense && (
+                      {uploadedDocuments.idCard && (
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => window.open(uploadedDocuments.businessLicense.url, '_blank')}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleDocumentPreview(uploadedDocuments.idCard.url, 'ID Card Document')}
+                          className="text-green-700 hover:text-green-800 hover:bg-green-100"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           View
@@ -1021,13 +1210,52 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground mb-3">
-                    {uploadedDocuments.businessLicense 
-                      ? `Uploaded: ${uploadedDocuments.businessLicense.name}` 
+                    {uploadedDocuments.idCard 
+                      ? `Uploaded: ${uploadedDocuments.idCard.name}` 
                       : 'Document verified and stored securely'
                     }
                   </div>
                 </div>
               </div>
+
+              {/* Business License (for business accounts) */}
+              {isBusinessAccount && (
+                <div className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <Building className="w-5 h-5 text-primary" />
+                        <div>
+                          <p className="font-medium">Business License</p>
+                          <p className="text-sm text-muted-foreground">Business registration document</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          Verified
+                        </Badge>
+                        {uploadedDocuments.businessLicense && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDocumentPreview(uploadedDocuments.businessLicense.url, 'Business License Document')}
+                            className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      {uploadedDocuments.businessLicense 
+                        ? `Uploaded: ${uploadedDocuments.businessLicense.name}` 
+                        : 'Document verified and stored securely'
+                      }
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Status Message */}
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
@@ -1082,8 +1310,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => window.open(uploadedDocuments.idCard.url, '_blank')}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleDocumentPreview(uploadedDocuments.idCard.url, 'ID Card Document')}
+                          className="text-green-700 hover:text-green-800 hover:bg-green-100"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           View
@@ -1115,8 +1343,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => window.open(uploadedDocuments.businessLicense.url, '_blank')}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleDocumentPreview(uploadedDocuments.businessLicense.url, 'Business License Document')}
+                          className="text-green-700 hover:text-green-800 hover:bg-green-100"
                         >
                           <Eye className="w-4 h-4 mr-1" />
                           View
@@ -1168,6 +1396,14 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                         </div>
                       )}
 
+                      {/* Upload error message */}
+                      {uploadError && (
+                        <div className="mt-2 text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                          {uploadError}
+                        </div>
+                      )}
+
                       {/* Show uploaded ID document */}
                       {uploadedDocuments.idCard && (
                         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
@@ -1175,15 +1411,21 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                             <div className="flex items-center gap-3">
                               <FileText className="w-5 h-5 text-primary" />
                               <div>
-                                <button 
-                                  onClick={() => window.open(uploadedDocuments.idCard.url, '_blank')}
-                                  className="text-sm font-medium text-primary hover:text-primary/80 hover:underline transition-colors text-left"
-                                >
+                                <p className="text-sm font-medium text-primary">
                                   {uploadedDocuments.idCard.name}
-                                </button>
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleDocumentPreview(uploadedDocuments.idCard.url, 'ID Card Document')}
+                                className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </Button>
                               {/* Only show remove button if not submitted for review and AgriLink verification not requested */}
                               {currentUser.verificationStatus !== 'under-review' && !currentUser.verified && !agriLinkVerificationRequested && (
                                 <Button 
@@ -1217,6 +1459,61 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
             Back to Overview
           </Button>
         </div>
+
+        {/* Document Preview Modal */}
+        {(showDocumentPreview || isGeneratingPreview) && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-semibold">{previewDocument?.name || 'Document Preview'}</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Clean up blob URL if it exists
+                    if (previewDocument && previewDocument.data.startsWith('blob:')) {
+                      URL.revokeObjectURL(previewDocument.data);
+                    }
+                    setShowDocumentPreview(false);
+                    setPreviewDocument(null);
+                    setIsGeneratingPreview(false);
+                  }}
+                  className="p-2"
+                >
+                  ✕
+                </Button>
+              </div>
+              <div className="flex-1 p-4 overflow-auto">
+                {isGeneratingPreview ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-600">Generating document preview...</p>
+                    </div>
+                  </div>
+                ) : previewDocument ? (
+                  previewDocument.type === 'image' ? (
+                    <S3Image
+                      src={previewDocument.data}
+                      alt={previewDocument.name}
+                      className="max-w-full h-auto mx-auto"
+                      style={{ maxHeight: '70vh' }}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600 mb-4">Document Preview</p>
+                      <iframe
+                        src={previewDocument.data}
+                        className="w-full h-96 border"
+                        title={previewDocument.name}
+                      />
+                    </div>
+                  )
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1380,7 +1677,17 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                 </p>
 
                 {/* Only show upload card if no business document uploaded yet AND AgriLink verification not yet requested */}
-                {!uploadedDocuments.businessLicense && !agriLinkVerificationRequested && (
+                {(() => {
+                  console.log('🔍 Business License conditional rendering:', {
+                    hasBusinessLicense: !!uploadedDocuments.businessLicense,
+                    businessLicenseData: uploadedDocuments.businessLicense,
+                    agriLinkVerificationRequested,
+                    shouldShowUpload: !uploadedDocuments.businessLicense && !agriLinkVerificationRequested,
+                    currentUserVerified: currentUser.verified,
+                    currentUserVerificationStatus: currentUser.verificationStatus
+                  });
+                  return !uploadedDocuments.businessLicense && !agriLinkVerificationRequested;
+                })() && (
                   <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
                     <Building className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-sm font-medium mb-2">Upload Business Registration</p>
@@ -1409,15 +1716,21 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                       <div className="flex items-center gap-3">
                         <Building className="w-5 h-5 text-primary" />
                         <div>
-                          <button 
-                            onClick={() => window.open(uploadedDocuments.businessLicense.url, '_blank')}
-                            className="text-sm font-medium text-primary hover:text-primary/80 hover:underline transition-colors text-left"
-                          >
+                          <p className="text-sm font-medium text-primary">
                             {uploadedDocuments.businessLicense.name}
-                          </button>
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDocumentPreview(uploadedDocuments.businessLicense.url, 'Business License Document')}
+                          className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
                         {/* Only show remove button if not submitted for review and AgriLink verification not requested */}
                         {currentUser.verificationStatus !== 'under-review' && !currentUser.verified && !agriLinkVerificationRequested && (
                           <Button 
@@ -1448,6 +1761,61 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
             Back to Overview
           </Button>
         </div>
+
+        {/* Document Preview Modal */}
+        {(showDocumentPreview || isGeneratingPreview) && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-semibold">{previewDocument?.name || 'Document Preview'}</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Clean up blob URL if it exists
+                    if (previewDocument && previewDocument.data.startsWith('blob:')) {
+                      URL.revokeObjectURL(previewDocument.data);
+                    }
+                    setShowDocumentPreview(false);
+                    setPreviewDocument(null);
+                    setIsGeneratingPreview(false);
+                  }}
+                  className="p-2"
+                >
+                  ✕
+                </Button>
+              </div>
+              <div className="flex-1 p-4 overflow-auto">
+                {isGeneratingPreview ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-600">Generating document preview...</p>
+                    </div>
+                  </div>
+                ) : previewDocument ? (
+                  previewDocument.type === 'image' ? (
+                    <S3Image
+                      src={previewDocument.data}
+                      alt={previewDocument.name}
+                      className="max-w-full h-auto mx-auto"
+                      style={{ maxHeight: '70vh' }}
+                    />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600 mb-4">Document Preview</p>
+                      <iframe
+                        src={previewDocument.data}
+                        className="w-full h-96 border"
+                        title={previewDocument.name}
+                      />
+                    </div>
+                  )
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1626,7 +1994,8 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
           const hasBusinessInfo = Boolean(currentUser.businessName); // businessDescription is optional
           const hasBusinessLicense = agriLinkVerificationRequested
             ? (Boolean(currentUser.verificationDocuments?.businessLicense) && 
-               currentUser.verificationDocuments?.businessLicense?.status === 'uploaded') || 
+               currentUser.verificationDocuments?.businessLicense?.status && 
+               currentUser.verificationDocuments?.businessLicense?.status !== 'pending') || 
               Boolean(uploadedDocuments.businessLicense) // Fallback to local state if database not updated yet
             : Boolean(uploadedDocuments.businessLicense); // Only check local state when not submitted
           
@@ -2120,12 +2489,12 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
 
       </div>
 
-      {/* Document Preview Modal */}
-      {showDocumentPreview && previewDocument && (
+      {/* Document Preview Modal - Top Level */}
+      {(showDocumentPreview || isGeneratingPreview) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full flex flex-col">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold">{previewDocument.name}</h3>
+              <h3 className="text-lg font-semibold">{previewDocument?.name || 'Document Preview'}</h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -2136,6 +2505,7 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
                   }
                   setShowDocumentPreview(false);
                   setPreviewDocument(null);
+                  setIsGeneratingPreview(false);
                 }}
                 className="p-2"
               >
@@ -2143,27 +2513,47 @@ export function AccountTypeVerification({ currentUser, onBack, onVerificationCom
               </Button>
             </div>
             <div className="flex-1 p-4 overflow-auto">
-              {previewDocument.type === 'image' ? (
-                <img
-                  src={previewDocument.data}
-                  alt={previewDocument.name}
-                  className="max-w-full h-auto mx-auto"
-                  style={{ maxHeight: '70vh' }}
-                />
+              {isGeneratingPreview ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Generating document preview...</p>
+                  </div>
+                </div>
+              ) : previewDocument ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  {previewDocument.type === 'image' ? (
+                    <img
+                      src={previewDocument.data}
+                      alt={previewDocument.name}
+                      className="max-w-full max-h-full object-contain"
+                      onError={(e) => {
+                        console.error('Image load error:', e);
+                        setUploadError('Failed to load document image');
+                      }}
+                    />
+                  ) : (
+                    <iframe
+                      src={previewDocument.data}
+                      className="w-full h-full border-0"
+                      title={previewDocument.name}
+                      onError={(e) => {
+                        console.error('Document load error:', e);
+                        setUploadError('Failed to load document');
+                      }}
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">Document Preview</p>
-                  <iframe
-                    src={previewDocument.data}
-                    className="w-full h-96 border"
-                    title={previewDocument.name}
-                  />
+                  <p className="text-gray-600">No document to preview</p>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

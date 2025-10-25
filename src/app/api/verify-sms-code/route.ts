@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { awsSnsService } from '@/lib/aws-sns-service';
-
+import { twilioService } from '@/lib/twilio-service';
 import jwt from 'jsonwebtoken';
 import { sql } from '@/lib/db';
 
@@ -18,7 +17,7 @@ export async function POST(request: NextRequest) {
     const userId = decoded.userId;
 
     const body = await request.json();
-    const { phoneNumber, code, verificationSid } = body;
+    const { phoneNumber, code, verificationId } = body;
 
     if (!phoneNumber || !code) {
       return NextResponse.json(
@@ -27,8 +26,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify code using AWS SNS service
-    const result = await awsSnsService.verifyCode(userId, phoneNumber, code);
+    // Verify code using Twilio service
+    const result = await twilioService.verifyCode(userId, phoneNumber, code);
     
     if (!result.success) {
       const errorMessage = result.error || result.message || 'Failed to verify code';

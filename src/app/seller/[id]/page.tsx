@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/AppHeader";
 import { SellerStorefront } from "@/components/SellerStorefront";
 import { ChatInterface } from "@/components/ChatInterface";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CheckCircle, AlertCircle } from "lucide-react";
 
 export default function SellerStorefrontPage() {
   const [seller, setSeller] = useState<any>(null);
@@ -16,6 +16,7 @@ export default function SellerStorefrontPage() {
   const [previewMode, setPreviewMode] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [imageMessage, setImageMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const router = useRouter();
   const params = useParams();
   const sellerId = params.id as string;
@@ -89,14 +90,19 @@ export default function SellerStorefrontPage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
+      // Clear any previous messages
+      setImageMessage(null);
+      
       // Validate file
       if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file');
+        setImageMessage({ type: 'error', text: 'Please select a valid image file' });
+        setTimeout(() => setImageMessage(null), 5000);
         return;
       }
       
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        alert('Image size must be less than 5MB');
+        setImageMessage({ type: 'error', text: 'Image size must be less than 5MB' });
+        setTimeout(() => setImageMessage(null), 5000);
         return;
       }
 
@@ -142,13 +148,15 @@ export default function SellerStorefrontPage() {
             storefrontImage: dataUrl
           }));
 
-          alert('Storefront image updated successfully!');
+          setImageMessage({ type: 'success', text: 'Storefront image updated successfully!' });
+          setTimeout(() => setImageMessage(null), 5000);
         };
         
         reader.readAsDataURL(file);
       } catch (error) {
         console.error('Failed to upload image:', error);
-        alert('Failed to upload image. Please try again.');
+        setImageMessage({ type: 'error', text: 'Failed to upload image. Please try again.' });
+        setTimeout(() => setImageMessage(null), 5000);
       }
     };
     input.click();
@@ -227,6 +235,7 @@ export default function SellerStorefrontPage() {
           previewMode={previewMode}
           onTogglePreviewMode={handleTogglePreviewMode}
           currentUser={user}
+          imageMessage={imageMessage}
         />
       </div>
 

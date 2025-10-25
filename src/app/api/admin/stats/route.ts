@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       sql`SELECT COUNT(*) as count FROM conversations`,
       sql`SELECT COUNT(*) as count FROM messages`,
       sql`SELECT COUNT(*) as count FROM user_verification WHERE verified = true`,
-      sql`SELECT COUNT(*) as count FROM user_verification WHERE "verificationStatus" = 'pending'`
+      sql`SELECT COUNT(*) as count FROM verification_requests`
     ]);
 
     return NextResponse.json({

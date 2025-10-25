@@ -11,6 +11,7 @@ import { UserBadge, getUserVerificationLevel, getUserAccountType } from "@/compo
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/AppHeader";
 import { ChatInterface } from "@/components/ChatInterface";
+import { S3Image } from "@/components/S3Image";
 import { 
   ChevronLeft,
   ChevronRight, 
@@ -347,14 +348,10 @@ export default function ProductDetailsPage() {
                       <div className="space-y-3">
                         {/* Main Image Display with Navigation */}
                         <div className="relative">
-                          <img 
+                          <S3Image 
                             src={productImages[currentImageIndex]} 
                             alt={`${product.name} - Image ${currentImageIndex + 1}`}
                             className="w-full h-64 object-cover rounded-lg cursor-pointer select-none"
-                            onTouchStart={handleTouchStart}
-                            onTouchMove={handleTouchMove}
-                            onTouchEnd={handleTouchEnd}
-                            draggable={false}
                           />
                           
                           {/* Image Counter - Only show when multiple images */}
@@ -380,16 +377,20 @@ export default function ProductDetailsPage() {
                                   
                                   return (
                                     <div key={actualIndex} className="relative flex-shrink-0">
-                                      <img 
-                                        src={image} 
-                                        alt={`${product.name} - View ${actualIndex + 1}`}
-                                        className={`w-16 h-16 object-cover rounded border-2 cursor-pointer transition-all ${
-                                          actualIndex === currentImageIndex 
-                                            ? 'border-primary ring-2 ring-primary/20' 
-                                            : 'border-border hover:border-primary'
-                                        }`}
+                                      <div
                                         onClick={() => handleThumbnailClick(actualIndex)}
-                                      />
+                                        className="cursor-pointer"
+                                      >
+                                        <S3Image 
+                                          src={image} 
+                                          alt={`${product.name} - View ${actualIndex + 1}`}
+                                          className={`w-16 h-16 object-cover rounded border-2 transition-all ${
+                                            actualIndex === currentImageIndex 
+                                              ? 'border-primary ring-2 ring-primary/20' 
+                                              : 'border-border hover:border-primary'
+                                          }`}
+                                        />
+                                      </div>
                                       
                                       {/* Left Chevron - Overlay on first thumbnail */}
                                       {isFirst && canScrollLeft && (

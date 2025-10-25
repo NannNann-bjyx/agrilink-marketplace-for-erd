@@ -5,7 +5,7 @@ import { formatMemberSinceDate } from "../utils/dates";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { S3Image } from './S3Image';
 import { UserBadge, getUserVerificationLevel, getUserAccountType } from "./UserBadgeSystem";
 import { EmailVerificationStatus } from "./EmailVerificationPrompt";
 import { 
@@ -132,7 +132,7 @@ export function UserMenuWithSupport({ user, onLogout, onViewStorefront, onUpdate
             <div className="text-center">
               <Avatar className="w-20 h-20 mx-auto mb-4">
                 {user.profileImage || user.avatar ? (
-                  <ImageWithFallback 
+                  <S3Image 
                     src={user.profileImage || user.avatar} 
                     alt={`${user.name}'s profile`}
                     className="w-full h-full object-cover rounded-full"
@@ -397,7 +397,7 @@ export function UserMenuWithSupport({ user, onLogout, onViewStorefront, onUpdate
         >
           <Avatar className="h-9 w-9 md:h-10 md:w-10">
             {user.profileImage || user.avatar ? (
-              <ImageWithFallback 
+              <S3Image 
                 src={user.profileImage || user.avatar} 
                 alt={`${user.name}'s profile`}
                 className="w-full h-full object-cover rounded-full"

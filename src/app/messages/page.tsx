@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AccountTypeBadge, PublicVerificationStatus, getUserAccountType } from "@/components/UserBadgeSystem";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { S3Image } from "@/components/S3Image";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AppHeader } from "@/components/AppHeader";
@@ -317,14 +317,10 @@ export default function MessagesPage() {
                   <div className="flex gap-4">
                     {/* Profile Image */}
                     <div className="flex-shrink-0">
-                      <img 
+                      <S3Image 
                         src={conversation.otherParty.profileImage || '/api/placeholder/400/300'}
                         alt={conversation.otherParty.name}
                         className="w-12 h-12 rounded-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/api/placeholder/400/300';
-                        }}
                       />
                     </div>
 
@@ -424,6 +420,11 @@ export default function MessagesPage() {
                     otherPartyId={conversation.otherParty.id}
                     conversationId={conversation.id}
                     onClose={() => setSelectedConversation(null)}
+                    onMessagesRead={(conversationId) => {
+                      console.log('🔄 Messages read callback triggered for:', conversationId);
+                      console.log('🔄 Refreshing conversations from callback...');
+                      loadConversations();
+                    }}
                     otherPartyVerified={conversation.otherParty.verified}
                     otherPartyProfileImage={conversation.otherParty.profileImage}
                     otherPartyVerificationStatus={{

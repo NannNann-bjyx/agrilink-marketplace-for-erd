@@ -100,17 +100,33 @@ export async function POST(request: NextRequest) {
     `;
     const docsToReject = (reqDocsRow && reqDocsRow.verificationDocuments) || (uvDocsRow && uvDocsRow.verificationDocuments) || null;
 
-    // Move/clear documents in user_verification and update status
+    // Check current verification status before updating
+    const [currentVerification] = await sql`
+      SELECT "verificationStatus", verified
+      FROM user_verification 
+      WHERE "userId" = ${verificationRequest.userId}
+    `;
+
+    // Only update verification status if user is not already verified
+    // If user is already verified, only move documents but keep verification status
+    const shouldUpdateStatus = !currentVerification?.verified;
+    const newStatus = shouldUpdateStatus ? 'rejected' : currentVerification?.verificationStatus || 'rejected';
+    
+    console.log('📊 Current verification status:', currentVerification);
+    console.log('📊 Should update status:', shouldUpdateStatus);
+    console.log('📊 New status will be:', newStatus);
+
+    // Move/clear documents in user_verification and conditionally update status
     await sql`
       UPDATE user_verification 
       SET 
         "rejectedDocuments" = ${docsToReject},
         "verificationDocuments" = NULL,
-        "verificationStatus" = 'rejected',
+        "verificationStatus" = ${newStatus},
         "updatedAt" = NOW()
       WHERE "userId" = ${verificationRequest.userId}
     `;
-    console.log('✅ Moved documents to rejectedDocuments, cleared active documents, and updated status to rejected');
+    console.log('✅ Moved documents to rejectedDocuments, cleared active documents, and updated status to:', newStatus);
 
     // Check if user_verification record exists
     const [existingVerification] = await sql`
@@ -130,7 +146,7 @@ export async function POST(request: NextRequest) {
       `;
       console.log('✅ Created user_verification record');
     } else {
-      console.log('📊 Current user_verification status:', existingVerification);
+      console.log('📊 Current user_verification status after update:', existingVerification);
       console.log('✅ User verification record already updated above');
     }
 
@@ -138,7 +154,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Verification request rejected successfully' 
+      message: 'Verification request rejected successfully',
+      userId: verificationRequest.userId // Include userId for client-side notification
     });
 
   } catch (error: any) {

@@ -1,3 +1,4 @@
+import { S3Image } from './S3Image';
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -5,7 +6,7 @@ import { Textarea } from "./ui/textarea";
 import { formatMemberSinceDate, getRelativeTime } from "../utils/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { S3Avatar } from "./S3Avatar";
 import { UserBadge, PublicVerificationStatus, getUserVerificationLevel, getUserAccountType, AccountTypeBadge } from "./UserBadgeSystem";
 import { Separator } from "./ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -27,6 +28,8 @@ import {
   Store,
   Award,
   User,
+  CheckCircle,
+  AlertCircle,
   Clock,
   Users,
   Camera,
@@ -35,7 +38,6 @@ import {
   Mail,
   ExternalLink,
   Shield,
-  CheckCircle,
   Building,
   Truck,
   Leaf,
@@ -98,6 +100,7 @@ interface SellerStorefrontProps {
   previewMode?: boolean;
   onTogglePreviewMode?: (mode: boolean) => void;
   currentUser?: any;
+  imageMessage?: { type: 'success' | 'error', text: string } | null;
 }
 
 export function SellerStorefront({ 
@@ -112,7 +115,8 @@ export function SellerStorefront({
   onUpdateStorefront,
   previewMode = false,
   onTogglePreviewMode,
-  currentUser
+  currentUser,
+  imageMessage
 }: SellerStorefrontProps) {
   // Editing states
   const [editing, setEditing] = useState<{
@@ -452,7 +456,7 @@ export function SellerStorefront({
                 {/* Seller Image */}
                 <div className="relative group">
                   {seller.storefrontImage ? (
-                    <img 
+                    <S3Image 
                       src={seller.storefrontImage} 
                       alt={seller.name}
                       className="w-full h-48 object-cover rounded-lg"
@@ -477,6 +481,22 @@ export function SellerStorefront({
                     </Button>
                   )}
                 </div>
+
+                {/* Image upload message */}
+                {imageMessage && (
+                  <div className={`text-sm p-3 rounded-md border flex items-center gap-2 ${
+                    imageMessage.type === 'success' 
+                      ? 'text-green-600 bg-green-50 border-green-200' 
+                      : 'text-red-600 bg-red-50 border-red-200'
+                  }`}>
+                    {imageMessage.type === 'success' ? (
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                    )}
+                    {imageMessage.text}
+                  </div>
+                )}
 
                 {/* Basic Info */}
                 <div className="group">
@@ -665,12 +685,16 @@ export function SellerStorefront({
                 {sellerStats.recentReviews.slice(0, 3).map((review: any) => (
                   <div key={review.id || `review-${Math.random()}`} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-start gap-2">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={review.reviewer_image || review.reviewer?.profileImage} />
-                        <AvatarFallback className="text-xs font-medium">
-                          {(review.reviewer_name || review.reviewer?.name || 'U').charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <S3Avatar 
+                        src={review.reviewer_image || review.reviewer?.profileImage}
+                        alt={review.reviewer_name || review.reviewer?.name || 'User'}
+                        className="w-8 h-8"
+                        fallback={
+                          <span className="text-xs font-medium">
+                            {(review.reviewer_name || review.reviewer?.name || 'U').charAt(0).toUpperCase()}
+                          </span>
+                        }
+                      />
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 mb-1">
@@ -1522,7 +1546,7 @@ export function SellerStorefront({
                     >
                       <CardContent className="p-4">
                         <div className="flex gap-4">
-                          <img 
+                          <S3Image 
                             src={product.imageUrl || product.image || undefined} 
                             alt={product.name}
                             className="w-20 h-20 object-cover rounded-lg"

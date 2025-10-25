@@ -1,7 +1,6 @@
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
+import { s3UploadService, S3UploadedFile } from './s3-upload';
 
+// Re-export S3 types for backward compatibility
 export interface UploadedFile {
   filename: string;
   filepath: string;
@@ -11,7 +10,8 @@ export interface UploadedFile {
 }
 
 /**
- * Upload a base64 image to the filesystem and return the file path
+ * Upload a base64 image to S3 and return the file path
+ * This function now uses S3 instead of local filesystem for Vercel compatibility
  */
 export async function uploadBase64Image(
   base64Data: string,
@@ -19,51 +19,16 @@ export async function uploadBase64Image(
   originalName?: string
 ): Promise<UploadedFile> {
   try {
-    // Extract the base64 data and mime type
-    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      throw new Error('Invalid base64 data format');
-    }
-
-    const mimeType = matches[1];
-    const base64String = matches[2];
+    const s3Result = await s3UploadService.uploadBase64Image(base64Data, folder, originalName);
     
-    // Validate mime type
-    if (!mimeType.startsWith('image/')) {
-      throw new Error('File must be an image');
-    }
-
-    // Convert base64 to buffer
-    const buffer = Buffer.from(base64String, 'base64');
-    
-    // Generate unique filename
-    const fileExtension = mimeType.split('/')[1] || 'jpg';
-    const uniqueId = randomUUID();
-    const filename = `${uniqueId}.${fileExtension}`;
-    
-    // Create directory if it doesn't exist
-    const uploadDir = join(process.cwd(), 'public', 'uploads', folder);
-    await mkdir(uploadDir, { recursive: true });
-    
-    // Write file to filesystem
-    const filepath = join(uploadDir, filename);
-    await writeFile(filepath, buffer);
-    
-    // Return file information
+    // Convert S3 result to legacy format for backward compatibility
     const uploadedFile: UploadedFile = {
-      filename,
-      filepath: `/uploads/${folder}/${filename}`, // Public URL path
-      originalName: originalName || `upload.${fileExtension}`,
-      size: buffer.length,
-      mimeType
+      filename: s3Result.filename,
+      filepath: s3Result.filepath, // Now contains S3 URL
+      originalName: s3Result.originalName,
+      size: s3Result.size,
+      mimeType: s3Result.mimeType
     };
-    
-    console.log('✅ File uploaded successfully:', {
-      folder,
-      filename,
-      size: buffer.length,
-      mimeType
-    });
     
     return uploadedFile;
   } catch (error) {
@@ -73,7 +38,7 @@ export async function uploadBase64Image(
 }
 
 /**
- * Upload multiple base64 images
+ * Upload multiple base64 images to S3
  */
 export async function uploadMultipleBase64Images(
   base64DataArray: string[],
@@ -88,14 +53,27 @@ export async function uploadMultipleBase64Images(
 }
 
 /**
- * Delete a file from the filesystem
+ * Delete a file from S3
  */
 export async function deleteFile(filepath: string): Promise<void> {
   try {
-    const { unlink } = await import('fs/promises');
-    const fullPath = join(process.cwd(), 'public', filepath);
-    await unlink(fullPath);
-    console.log('✅ File deleted successfully:', filepath);
+    // Check if it's already an S3 key (starts with folder name)
+    if (filepath.startsWith('profiles/') || filepath.startsWith('storefronts/') || 
+        filepath.startsWith('verification/') || filepath.startsWith('products/')) {
+      // It's already an S3 key, delete directly
+      await s3UploadService.deleteFile(filepath);
+    } else {
+      // Try to extract S3 key from URL if it's an S3 URL
+      const s3Key = s3UploadService.extractS3KeyFromUrl(filepath);
+      
+      if (s3Key) {
+        // It's an S3 URL, delete from S3
+        await s3UploadService.deleteFile(s3Key);
+      } else {
+        // Legacy local file path - log but don't error
+        console.log('📁 [LEGACY] Local file deletion not supported in S3 mode:', filepath);
+      }
+    }
   } catch (error) {
     console.error('❌ File deletion failed:', error);
     // Don't throw error for file deletion failures

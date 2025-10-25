@@ -10,6 +10,7 @@ import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { Separator } from "./ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { S3Image } from "./S3Image";
 import { 
   ChevronLeft,
   Package, 
@@ -45,6 +46,8 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [allCategories, setAllCategories] = useState<Array<{id: string, name: string}>>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageMessage, setImageMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Custom options state
@@ -626,7 +629,7 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
   }, [currentUser?.id]);
 
   // Handle multiple image upload
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
@@ -638,34 +641,36 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
       return;
     }
 
-    // Check each file size (limit to 3MB per image for better performance)
-    const oversizedFiles = files.filter(file => file.size > 3 * 1024 * 1024);
+    // Check each file size (limit to 5MB per image)
+    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      setValidationErrors(prev => ({ ...prev, images: 'Each image must be smaller than 3MB' }));
+      setValidationErrors(prev => ({ ...prev, images: 'Each image must be smaller than 5MB' }));
       return;
     }
 
-    // Clear any previous image errors
+    // Clear any previous errors and messages
     setValidationErrors(prev => {
       const newErrors = { ...prev };
       delete newErrors.images;
       return newErrors;
     });
+    setImageMessage(null);
+    setImageUploading(true);
 
-    // Process all selected files
-    const processFiles = async () => {
+    try {
       const newImages: string[] = [];
       
+      // Process all selected files and convert to base64
       for (const file of files) {
-        await new Promise<void>((resolve) => {
+        // Convert to base64
+        const base64Data = await new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onload = (e) => {
-            const result = e.target?.result as string;
-            newImages.push(result);
-            resolve();
-          };
+          reader.onload = (e) => resolve(e.target?.result as string);
           reader.readAsDataURL(file);
         });
+        
+        // Store base64 data directly (will be uploaded to S3 when form is submitted)
+        newImages.push(base64Data);
       }
       
       setFormData(prev => ({
@@ -674,9 +679,23 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
         // Update legacy image field with first image for backward compatibility
         image: prev.images?.length === 0 && newImages.length > 0 ? newImages[0] : prev.image
       }));
-    };
 
-    processFiles();
+      setImageMessage({ 
+        type: 'success', 
+        text: `Successfully added ${files.length} image${files.length > 1 ? 's' : ''}! Images will be uploaded when you save the product.` 
+      });
+      setTimeout(() => setImageMessage(null), 5000);
+      
+    } catch (error) {
+      console.error('Failed to process images:', error);
+      setImageMessage({ 
+        type: 'error', 
+        text: 'Failed to process images. Please try again.' 
+      });
+      setTimeout(() => setImageMessage(null), 5000);
+    } finally {
+      setImageUploading(false);
+    }
     
     // Clear the input value to allow re-uploading the same files
     if (fileInputRef.current) {
@@ -921,7 +940,7 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
                       <div className="grid grid-cols-2 gap-2 h-[120px] lg:h-[130px] overflow-y-auto">
                         {formData.images.map((image, index) => (
                           <div key={index} className="relative group">
-                            <img
+                            <S3Image
                               src={image}
                               alt={`Product ${index + 1}`}
                               className="w-full h-16 md:h-18 object-cover rounded-lg border hover:opacity-90 transition-opacity"
@@ -1014,6 +1033,30 @@ export function SimplifiedProductForm({ currentUser, onBack, onSave, editingProd
                 {/* Image Upload Errors */}
                 {validationErrors.images && (
                   <p className="text-sm text-destructive">{validationErrors.images}</p>
+                )}
+                
+                {/* Image Upload Message */}
+                {imageMessage && (
+                  <div className={`text-sm p-3 rounded-md border flex items-center gap-2 ${
+                    imageMessage.type === 'success' 
+                      ? 'text-green-600 bg-green-50 border-green-200' 
+                      : 'text-red-600 bg-red-50 border-red-200'
+                  }`}>
+                    {imageMessage.type === 'success' ? (
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                    )}
+                    {imageMessage.text}
+                  </div>
+                )}
+                
+                {/* Image Upload Loading */}
+                {imageUploading && (
+                  <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-md border border-blue-200 flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    Uploading images...
+                  </div>
                 )}
               </CardContent>
             </Card>

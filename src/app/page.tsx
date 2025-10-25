@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { MarketplaceHero } from "@/components/MarketplaceHero";
@@ -41,86 +41,47 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12);
-  const [activeChats, setActiveChats] = useState<any[]>([]); // Array of active chat popups
+  
+  // Chat popup state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedSeller, setSelectedSeller] = useState<any>(null);
+  
   const router = useRouter();
 
   useEffect(() => {
-    // Start loading products immediately
-    loadProducts();
-    
-    // Add global event listener for chat popup
-    const handleOpenChatEvent = (event: CustomEvent) => {
-      const { userId, userName, productId, productName, conversationId } = event.detail;
-      
-      // Check if chat is already open
-      const existingChat = activeChats.find(chat => 
-        chat.otherPartyId === userId && chat.productId === productId
-      );
-      
-      if (existingChat) {
-        // Chat already open, bring it to front (you could implement this later)
-        return;
-      }
-
-      // Create new chat popup
-      const newChat = {
-        id: conversationId || `chat_${userId}_${productId}_${Date.now()}`,
-        otherPartyId: userId,
-        otherPartyName: userName,
-        otherPartyType: 'user', // Default type
-        otherPartyLocation: '',
-        otherPartyRating: 0,
-        productName: productName,
-        productId: productId,
-        otherPartyVerified: false,
-        otherPartyProfileImage: '',
-        otherPartyVerificationStatus: {
-          trustLevel: 'unverified',
-          tierLabel: 'Unverified',
-          levelBadge: '!'
-        },
-        // Add basic product data for offer button logic
-        product: {
-          id: productId,
-          name: productName,
-          price: 0, // Will be updated when product data is loaded
-          unit: 'units',
-          image: '',
-          sellerId: userId,
-          availableQuantity: '0' // Will be updated when product data is loaded
-        }
-      };
-
-      setActiveChats(prev => [...prev, newChat]);
-    };
-
-    // Add event listener
-    window.addEventListener('openChat', handleOpenChatEvent as EventListener);
-
-    // Listen for offer status changes to refresh available quantities
-    const handleOfferStatusChange = (event: CustomEvent) => {
-      console.log('🔄 Offer status changed, refreshing marketplace...', event.detail);
-      loadProducts();
-    };
-    window.addEventListener('offerStatusChanged', handleOfferStatusChange as EventListener);
-
-    // Check for existing user session (non-blocking)
+    // Check if user is logged in
     const token = localStorage.getItem("token");
     const userData = localStorage.getItem("user");
-    
+
     if (token && userData) {
       try {
-        setCurrentUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        setCurrentUser(parsedUser);
       } catch (error) {
         console.error("Error parsing user data:", error);
       }
     }
 
-    // Cleanup function
-    return () => {
-      window.removeEventListener('openChat', handleOpenChatEvent as EventListener);
-      window.removeEventListener('offerStatusChanged', handleOfferStatusChange as EventListener);
+    // Fetch products from API
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('/api/products');
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data.products || []);
+          setFilteredProducts(data.products || []);
+        } else {
+          console.error('Failed to fetch products:', response.status);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+
+    fetchProducts();
   }, []);
 
   // Filter out current user's products when both products and currentUser are available
@@ -137,30 +98,11 @@ export default function HomePage() {
     }
   }, [products, currentUser]);
 
-  const loadProducts = async () => {
-    try {
-      const response = await fetch("/api/products");
-      if (response.ok) {
-        const data = await response.json();
-        setProducts(data.products || []);
-        // Don't set filteredProducts here - let useEffect handle it
-      }
-    } catch (error) {
-      console.error("Error loading products:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setCurrentUser(null);
-    router.push("/");
-  };
-
-  const handleBackToMarketplace = () => {
-    router.push("/");
+    router.push("/login");
   };
 
   const handleGoToLogin = () => {
@@ -184,7 +126,7 @@ export default function HomePage() {
   };
 
   const handleEditProfile = () => {
-    router.push("/profile?edit=true");
+    router.push("/profile");
   };
 
   const handleShowVerification = () => {
@@ -195,79 +137,93 @@ export default function HomePage() {
     router.push(`/seller/${sellerId}`);
   };
 
-  // Chat popup handlers
-  const handleOpenChat = (sellerId: string, productId: string) => {
-    // Find the product and seller info
+  const handleOpenChat = async (sellerId: string, productId: string) => {
+    // Find the product and seller data
     const product = products.find(p => p.id === productId);
     if (!product) return;
-
-    // Check if chat is already open
-    const existingChat = activeChats.find(chat => 
-      chat.otherPartyId === sellerId && chat.productId === productId
-    );
     
-    if (existingChat) {
-      // Chat already open, bring it to front (you could implement this later)
-      return;
-    }
-
-    // Create new chat popup
-    const newChat = {
-      id: `chat_${sellerId}_${productId}_${Date.now()}`,
-      otherPartyId: sellerId,
-      otherPartyName: product.seller.name,
-      otherPartyType: product.seller.userType,
-      otherPartyAccountType: product.seller.accountType || 'individual',
-      otherPartyLocation: product.seller.location,
-      otherPartyRating: 0, // We don't have rating in product data
-      productName: product.name,
-      productId: productId,
-      otherPartyVerified: product.seller.verified || false,
-      otherPartyProfileImage: (product.seller as any).profileImage || '',
-      otherPartyVerificationStatus: {
-        trustLevel: product.seller.verified ? 'id-verified' : 'unverified',
-        tierLabel: product.seller.verified ? 'Verified' : 'Unverified',
-        levelBadge: product.seller.verified ? '✓' : '!'
-      },
-      // Add complete product data for offer button logic
-      product: {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        unit: product.unit,
-        image: product.imageUrl,
-        sellerId: product.seller.id,
-        availableQuantity: (product as any).availableQuantity || '0',
-        seller: product.seller
+    // Fetch seller details
+    try {
+      const response = await fetch(`/api/seller/${sellerId}`);
+      if (response.ok) {
+        const sellerData = await response.json();
+        setSelectedSeller(sellerData);
+        setSelectedProduct(product);
+        setIsChatOpen(true);
+      } else {
+        // Fallback to basic seller data from product
+        setSelectedSeller({
+          id: sellerId,
+          name: product.seller.name,
+          userType: product.seller.userType,
+          location: product.seller.location,
+          verified: product.seller.verified,
+          accountType: product.seller.accountType,
+          ratings: { rating: 0 }
+        });
+        setSelectedProduct(product);
+        setIsChatOpen(true);
       }
-    };
-
-    setActiveChats(prev => [...prev, newChat]);
-  };
-
-  const handleCloseChat = (chatId: string) => {
-    setActiveChats(prev => prev.filter(chat => chat.id !== chatId));
+    } catch (error) {
+      console.error('Error fetching seller data:', error);
+      // Fallback to basic seller data from product
+      setSelectedSeller({
+        id: sellerId,
+        name: product.seller.name,
+        userType: product.seller.userType,
+        location: product.seller.location,
+        verified: product.seller.verified,
+        accountType: product.seller.accountType,
+        ratings: { rating: 0 }
+      });
+      setSelectedProduct(product);
+      setIsChatOpen(true);
+    }
   };
 
   const handleShowAdminVerification = () => {
-    router.push("/admin");
+    router.push("/admin/verification");
   };
 
   const handleUpdateUser = (updates: any) => {
-    // This would typically update the user context
     console.log("Update user:", updates);
   };
 
-  const handleFilterChange = useCallback((filteredProducts: Product[]) => {
+  const handleFilterChange = (filteredProducts: Product[]) => {
     setFilteredProducts(filteredProducts);
     setCurrentPage(1); // Reset to first page when filters change
-  }, []);
+  };
+
+  const handleProductClick = (productId: string) => {
+    router.push(`/product/${productId}`);
+  };
+
+  const handleSellerClick = (sellerId: string) => {
+    router.push(`/seller/${sellerId}`);
+  };
+
+  const handleChatClick = (sellerId: string) => {
+    router.push(`/messages?sellerId=${sellerId}`);
+  };
+
+  const handleOfferClick = (productId: string) => {
+    router.push(`/offers/${productId}`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader 
         currentUser={currentUser}
         onLogout={handleLogout}
+        onGoToLogin={handleGoToLogin}
+        onGoToRegister={handleGoToRegister}
+        onGoToDashboard={handleGoToDashboard}
+        onViewMessages={handleViewMessages}
+        onViewProfile={handleViewProfile}
+        onEditProfile={handleEditProfile}
+        onShowVerification={handleShowVerification}
+        onShowAdminVerification={handleShowAdminVerification}
+        onUpdateUser={handleUpdateUser}
       />
       
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -299,18 +255,15 @@ export default function HomePage() {
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {currentProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                currentUser={currentUser}
-                onProductClick={(productId) => router.push(`/product/${productId}`)}
-                onSellerClick={(sellerId) => router.push(`/seller/${sellerId}`)}
-                onChatClick={(sellerId) => handleOpenChat(sellerId, product.id)}
-                onOfferClick={(productId) => {
-                  // Handle offer click
-                  console.log("Make offer for product:", productId);
-                }}
-              />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  currentUser={currentUser}
+                  onProductClick={handleProductClick}
+                  onSellerClick={handleSellerClick}
+                  onChatClick={(sellerId) => handleOpenChat(sellerId, product.id)}
+                  onOfferClick={handleOfferClick}
+                />
               ))}
             </div>
           );
@@ -343,36 +296,45 @@ export default function HomePage() {
       {/* Footer */}
       <AppFooter />
 
-      {/* Chat Popups - Facebook Style */}
-      {activeChats.map((chat, index) => (
-        <div
-          key={chat.id}
-          className="fixed bottom-4 right-4 z-50"
-          style={{ 
-            right: `${16 + (index * 400)}px`, // Stack chats horizontally
-            bottom: '16px'
-          }}
-        >
+      {/* Chat Popup */}
+      {isChatOpen && selectedProduct && selectedSeller && currentUser && (
+        <div className="fixed bottom-4 right-4 z-50">
           <div className="bg-white rounded-lg shadow-2xl w-96 h-[500px] flex flex-col border border-gray-200">
             <ChatInterface
-              otherPartyName={chat.otherPartyName}
-              otherPartyType={chat.otherPartyType}
-              otherPartyAccountType={chat.otherPartyAccountType || 'individual'}
-              otherPartyLocation={chat.otherPartyLocation}
-              otherPartyRating={chat.otherPartyRating}
-              productName={chat.productName}
-              productId={chat.productId}
-              otherPartyId={chat.otherPartyId}
-              onClose={() => handleCloseChat(chat.id)}
-              otherPartyVerified={chat.otherPartyVerified}
-              otherPartyProfileImage={chat.otherPartyProfileImage}
-              otherPartyVerificationStatus={chat.otherPartyVerificationStatus}
-              product={chat.product}
+              otherPartyName={selectedSeller.name}
+              otherPartyType={selectedSeller.userType}
+              otherPartyAccountType={selectedSeller.accountType || 'individual'}
+              otherPartyLocation={selectedSeller.location || ''}
+              otherPartyRating={selectedSeller.ratings?.rating || 0}
+              productName={selectedProduct.name}
+              productId={selectedProduct.id}
+              otherPartyId={selectedSeller.id}
+              onClose={() => {
+                setIsChatOpen(false);
+                setSelectedProduct(null);
+                setSelectedSeller(null);
+              }}
+              otherPartyVerified={selectedSeller.verified || false}
+              otherPartyProfileImage={selectedSeller.profileImage}
+              otherPartyVerificationStatus={{
+                trustLevel: selectedSeller.verified ? (selectedSeller.accountType === 'business' ? 'business-verified' : 'id-verified') : 'unverified',
+                tierLabel: selectedSeller.verified ? (selectedSeller.accountType === 'business' ? 'Business ✓' : 'Verified') : 'Unverified',
+                levelBadge: selectedSeller.verified ? (selectedSeller.accountType === 'business' ? '✓' : '✓') : '⚠'
+              }}
+              product={{
+                id: selectedProduct.id,
+                name: selectedProduct.name,
+                price: selectedProduct.price,
+                unit: selectedProduct.unit,
+                image: selectedProduct.imageUrl,
+                sellerId: selectedSeller.id,
+                availableQuantity: selectedProduct.availableQuantity || '0'
+              }}
               currentUser={currentUser}
             />
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

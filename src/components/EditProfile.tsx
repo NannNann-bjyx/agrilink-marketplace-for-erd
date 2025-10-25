@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Separator } from "./ui/separator";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { S3Image } from "./S3Image";
 import { myanmarRegions } from "../utils/regions";
 import { PhoneVerification } from "./PhoneVerification";
 
@@ -21,7 +21,8 @@ import {
   Camera,
   Edit,
   Plus,
-  Trash2
+  Trash2,
+  CheckCircle
 } from "lucide-react";
 
 interface User {
@@ -133,8 +134,8 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
           [currentField]: dataUrl
         }));
         
-        setSuccessMessage(`${type === 'profile' ? 'Profile' : 'Storefront'} image uploaded! Click "Save Changes" to apply.`);
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setSuccessMessage(`✅ ${type === 'profile' ? 'Profile' : 'Storefront'} image uploaded successfully! Click "Save Changes" to apply.`);
+        setTimeout(() => setSuccessMessage(''), 5000);
         setLoadingImage(null);
       };
       
@@ -234,11 +235,19 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
                 <div className="space-y-2">
                   <Label>Profile Picture</Label>
                   <div className="relative">
-                    <ImageWithFallback
+                    <S3Image
                       src={formData.profileImage}
                       alt="Profile"
                       className="w-full h-32 object-cover rounded-lg"
                     />
+                    {loadingImage === 'profile' && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                        <div className="text-white text-sm flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Uploading...
+                        </div>
+                      </div>
+                    )}
                     <Button
                       type="button"
                       size="sm"
@@ -247,7 +256,11 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
                       disabled={loadingImage === 'profile'}
                       title="Edit image"
                     >
-                      <Edit className="w-3 h-3" />
+                      {loadingImage === 'profile' ? (
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Edit className="w-3 h-3" />
+                      )}
                     </Button>
                   </div>
                   <input
@@ -266,11 +279,19 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
                   <div className="space-y-2">
                     <Label>Storefront Image</Label>
                     <div className="relative">
-                      <ImageWithFallback
+                      <S3Image
                         src={formData.storefrontImage}
                         alt="Storefront"
                         className="w-full h-32 object-cover rounded-lg"
                       />
+                      {loadingImage === 'storefront' && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                          <div className="text-white text-sm flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Uploading...
+                          </div>
+                        </div>
+                      )}
                       <Button
                         type="button"
                         size="sm"
@@ -279,7 +300,11 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
                         disabled={loadingImage === 'storefront'}
                         title="Edit image"
                       >
-                        <Edit className="w-3 h-3" />
+                        {loadingImage === 'storefront' ? (
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Edit className="w-3 h-3" />
+                        )}
                       </Button>
                     </div>
                     <input
@@ -475,7 +500,8 @@ export function EditProfile({ user, onClose, onSave }: EditProfileProps) {
 
             {/* Success message */}
             {successMessage && (
-              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200">
+              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600" />
                 {successMessage}
               </div>
             )}

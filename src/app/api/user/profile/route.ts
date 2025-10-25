@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from '@/lib/db';
+import { uploadBase64Image, deleteFile } from '@/lib/file-upload';
 
 import jwt from 'jsonwebtoken';
 
@@ -202,8 +203,38 @@ export async function PUT(request: NextRequest) {
       });
       
       const profileUpdates: any = {};
-      if (profileImage !== undefined) profileUpdates.profileImage = profileImage;
-      if (storefrontImage !== undefined) profileUpdates.storefrontImage = storefrontImage;
+      
+      // Upload profile image to S3 if provided
+      if (profileImage !== undefined) {
+        try {
+          console.log('📤 Uploading profile image to S3...');
+          const uploadedFile = await uploadBase64Image(profileImage, 'profiles', `profile-${user.userId}.jpg`);
+          profileUpdates.profileImage = uploadedFile.filepath;
+          console.log('✅ Profile image uploaded to S3:', uploadedFile.filepath);
+        } catch (error) {
+          console.error('❌ Profile image upload failed:', error);
+          return NextResponse.json(
+            { error: 'Failed to upload profile image' },
+            { status: 500 }
+          );
+        }
+      }
+      
+      // Upload storefront image to S3 if provided
+      if (storefrontImage !== undefined) {
+        try {
+          console.log('📤 Uploading storefront image to S3...');
+          const uploadedFile = await uploadBase64Image(storefrontImage, 'storefronts', `storefront-${user.userId}.jpg`);
+          profileUpdates.storefrontImage = uploadedFile.filepath;
+          console.log('✅ Storefront image uploaded to S3:', uploadedFile.filepath);
+        } catch (error) {
+          console.error('❌ Storefront image upload failed:', error);
+          return NextResponse.json(
+            { error: 'Failed to upload storefront image' },
+            { status: 500 }
+          );
+        }
+      }
 
       // Check if user_profiles record exists using Drizzle ORM
       const existingProfile = await db
@@ -215,16 +246,59 @@ export async function PUT(request: NextRequest) {
       console.log('🔍 Existing profile check:', existingProfile.length > 0 ? 'found' : 'not found');
 
       if (existingProfile.length > 0) {
+        // Get current profile data to clean up old images
+        const currentProfile = await db
+          .select({ profileImage: userProfiles.profileImage, storefrontImage: userProfiles.storefrontImage })
+          .from(userProfiles)
+          .where(eq(userProfiles.userId, user.userId))
+          .limit(1);
+        
         // Update existing record using Drizzle ORM
         console.log('🔄 Updating existing profile record...');
+        
+        // Only update the fields that were provided
+        const updateData: any = {};
+        if (profileUpdates.profileImage !== undefined) {
+          updateData.profileImage = profileUpdates.profileImage;
+        }
+        if (profileUpdates.storefrontImage !== undefined) {
+          updateData.storefrontImage = profileUpdates.storefrontImage;
+        }
+        
         await db
           .update(userProfiles)
-          .set({
-            profileImage: profileUpdates.profileImage || null,
-            storefrontImage: profileUpdates.storefrontImage || null,
-          })
+          .set(updateData)
           .where(eq(userProfiles.userId, user.userId));
         console.log('✅ Profile images updated successfully');
+        
+        // Clean up old images from S3
+        if (currentProfile.length > 0) {
+          const currentData = currentProfile[0];
+          
+          // Delete old profile image if we're updating it
+          if (profileUpdates.profileImage !== undefined && currentData.profileImage) {
+            try {
+              console.log('🗑️ Deleting old profile image from S3:', currentData.profileImage);
+              await deleteFile(currentData.profileImage);
+              console.log('✅ Old profile image deleted successfully');
+            } catch (error) {
+              console.error('❌ Failed to delete old profile image:', error);
+              // Don't fail the entire operation if cleanup fails
+            }
+          }
+          
+          // Delete old storefront image if we're updating it
+          if (profileUpdates.storefrontImage !== undefined && currentData.storefrontImage) {
+            try {
+              console.log('🗑️ Deleting old storefront image from S3:', currentData.storefrontImage);
+              await deleteFile(currentData.storefrontImage);
+              console.log('✅ Old storefront image deleted successfully');
+            } catch (error) {
+              console.error('❌ Failed to delete old storefront image:', error);
+              // Don't fail the entire operation if cleanup fails
+            }
+          }
+        }
       } else {
         // Insert new record using Drizzle ORM
         console.log('🆕 Creating new profile record for user:', user.userId);
@@ -414,6 +488,39 @@ export async function PUT(request: NextRequest) {
       });
       
       try {
+        // Process verification documents and upload to S3
+        const processedDocuments: any = {};
+        
+        for (const [docType, docData] of Object.entries(verificationDocuments)) {
+          if (docData && typeof docData === 'object' && docData.data) {
+            try {
+              console.log(`📤 Uploading ${docType} to S3...`);
+              const uploadedFile = await uploadBase64Image(
+                docData.data, 
+                'verification', 
+                `${docType}-${user.userId}-${docData.name || 'document'}`
+              );
+              
+              // Store S3 key instead of base64 data
+              processedDocuments[docType] = {
+                ...docData,
+                data: uploadedFile.filepath, // Store S3 key
+                s3Key: uploadedFile.filepath,
+                uploadedAt: new Date().toISOString()
+              };
+              
+              console.log(`✅ ${docType} uploaded to S3:`, uploadedFile.filepath);
+            } catch (uploadError) {
+              console.error(`❌ Failed to upload ${docType}:`, uploadError);
+              // Keep original data if upload fails
+              processedDocuments[docType] = docData;
+            }
+          } else {
+            // Keep non-data fields as is
+            processedDocuments[docType] = docData;
+          }
+        }
+
         const existingVerification = await db
           .select({ userId: userVerification.userId })
           .from(userVerification)
@@ -421,11 +528,11 @@ export async function PUT(request: NextRequest) {
           .limit(1);
 
         if (existingVerification.length > 0) {
-          await db.update(userVerification).set({ verificationDocuments }).where(eq(userVerification.userId, user.userId));
+          await db.update(userVerification).set({ verificationDocuments: processedDocuments }).where(eq(userVerification.userId, user.userId));
         } else {
           await db.insert(userVerification).values({
             userId: user.userId,
-            verificationDocuments
+            verificationDocuments: processedDocuments
           });
         }
         console.log('✅ Verification documents updated successfully');

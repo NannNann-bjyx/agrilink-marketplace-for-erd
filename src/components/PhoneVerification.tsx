@@ -16,11 +16,16 @@ interface PhoneVerificationProps {
 export function PhoneVerification({ currentUser, onVerificationComplete, onBack }: PhoneVerificationProps) {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phoneNumber, setPhoneNumber] = useState(currentUser.phone || '');
+  const [originalPhoneNumber, setOriginalPhoneNumber] = useState(currentUser.phone || null);
   
   // Update phone number when currentUser changes
   useEffect(() => {
     if (currentUser.phone) {
       setPhoneNumber(currentUser.phone);
+      setOriginalPhoneNumber(currentUser.phone);
+    } else {
+      setPhoneNumber('');
+      setOriginalPhoneNumber(null);
     }
   }, [currentUser.phone]);
 
@@ -31,7 +36,12 @@ export function PhoneVerification({ currentUser, onVerificationComplete, onBack 
     console.log('🔄 Current phoneNumber state:', phoneNumber);
     if (currentUser.phone) {
       setPhoneNumber(currentUser.phone);
+      setOriginalPhoneNumber(currentUser.phone);
       console.log('🔄 Set phoneNumber to:', currentUser.phone);
+    } else {
+      setPhoneNumber('');
+      setOriginalPhoneNumber(null);
+      console.log('🔄 No existing phone, setting originalPhoneNumber to null');
     }
   }, []);
   const [otpCode, setOtpCode] = useState('');
@@ -279,10 +289,9 @@ export function PhoneVerification({ currentUser, onVerificationComplete, onBack 
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    // Reset to current user's phone when starting to edit
+                    // Enter edit mode without resetting phone number
                     console.log('🔄 User clicked Edit button');
-                    console.log('🔄 Resetting phoneNumber to:', currentUser.phone);
-                    setPhoneNumber(currentUser.phone || '');
+                    console.log('🔄 Current phoneNumber:', phoneNumber);
                     setIsEditingPhone(true);
                   }}
                   disabled={isLoading}
@@ -296,23 +305,28 @@ export function PhoneVerification({ currentUser, onVerificationComplete, onBack 
               // Edit mode - show input field with save/cancel buttons
               <div className="space-y-2">
                 <div className="flex gap-2">
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+959123456789"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="flex-1"
-                    disabled={isLoading}
-                    autoFocus
-                  />
+                  <div className="flex-1 relative">
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+959123456789"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="flex-1"
+                      disabled={isLoading}
+                      autoFocus
+                    />
+                    {phoneNumber !== originalPhoneNumber && phoneNumber.trim() && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>
+                    )}
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
                       setIsEditingPhone(false);
                       // Reset to original phone number if user cancels
-                      setPhoneNumber(currentUser.phone || '');
+                      setPhoneNumber(originalPhoneNumber || '');
                     }}
                     disabled={isLoading}
                     className="h-10 px-3"
@@ -323,6 +337,11 @@ export function PhoneVerification({ currentUser, onVerificationComplete, onBack 
                 <p className="text-xs text-muted-foreground">
                   Include country code (e.g., +959 for Myanmar)
                 </p>
+                {isEditingPhone && phoneNumber === originalPhoneNumber && (
+                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                    💡 Change the phone number above to enable "Save & Send Code"
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -342,7 +361,7 @@ export function PhoneVerification({ currentUser, onVerificationComplete, onBack 
             )}
             <Button 
               onClick={handleSendOTP} 
-              disabled={isLoading || !phoneNumber.trim() || countdown > 0}
+              disabled={isLoading || !phoneNumber.trim() || countdown > 0 || (isEditingPhone && phoneNumber === originalPhoneNumber)}
               className="flex-1"
             >
               {isLoading ? 'Sending...' : 

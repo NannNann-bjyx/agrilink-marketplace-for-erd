@@ -8,6 +8,7 @@ import { Badge } from "./ui/badge";
 import { UserBadge, getUserVerificationLevel, getUserAccountType } from "./UserBadgeSystem";
 import { Alert, AlertDescription } from "./ui/alert";
 import { EmailVerificationPrompt } from "./EmailVerificationPrompt";
+import { S3Image } from './S3Image';
 import { 
   Plus, 
   Eye, 
@@ -579,7 +580,7 @@ export function FreshDashboard({
                 >
                   {/* Product Image */}
                   <div className="shrink-0">
-                    <img 
+                    <S3Image 
                       src={product.imageUrl || "/api/placeholder/400/300"} 
                       alt={product.name}
                       className="w-full sm:w-20 h-48 sm:h-20 object-cover rounded-lg"

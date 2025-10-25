@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { S3Image } from './S3Image';
 import { useState, useRef, useEffect } from "react";
 import { 
   User, 
@@ -53,6 +53,9 @@ interface EditingField {
 export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpdate, onViewStorefront }: ProfileProps) {
   const [editing, setEditing] = useState<EditingField | null>(null);
   const [editingImage, setEditingImage] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageSuccess, setImageSuccess] = useState('');
+  const [imageError, setImageError] = useState('');
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -244,16 +247,22 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
 
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file');
+      setImageSuccess('');
+      setImageError('Please select a valid image file');
+      setTimeout(() => setImageError(''), 5000);
       return;
     }
     
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image size must be less than 10MB');
+      setImageSuccess('');
+      setImageError('Image size must be less than 10MB');
+      setTimeout(() => setImageError(''), 5000);
       return;
     }
 
     try {
+      setImageUploading(true);
+      setImageError('');
       setEditingImage(false);
       
       const reader = new FileReader();
@@ -265,10 +274,16 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
       if (onUpdate) {
         await onUpdate({ profileImage: dataUrl });
         setFormData(prev => ({ ...prev, profileImage: dataUrl }));
+        setImageSuccess('✅ Profile image updated successfully!');
+        setTimeout(() => setImageSuccess(''), 5000);
       }
     } catch (error) {
       console.error('Failed to process image:', error);
-      alert('Failed to process image. Please try a different image.');
+      setImageSuccess('');
+      setImageError('Failed to process image. Please try a different image.');
+      setTimeout(() => setImageError(''), 5000);
+    } finally {
+      setImageUploading(false);
     }
   };
 
@@ -402,7 +417,7 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
               <div className="flex justify-center mb-6">
                 <div className="relative group">
                   {formData.profileImage ? (
-                    <ImageWithFallback
+                    <S3Image
                       src={formData.profileImage}
                       alt={`${formData.name}'s profile picture`}
                       className="w-28 h-28 rounded-full object-cover border-4 border-border shadow-lg"
@@ -411,6 +426,15 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
                     <div className="w-28 h-28 rounded-full border-4 border-border shadow-lg bg-muted flex items-center justify-center">
                       <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
                         <User className="w-6 h-6 text-primary" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {imageUploading && (
+                    <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                      <div className="text-white text-sm flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Uploading...
                       </div>
                     </div>
                   )}
@@ -429,6 +453,22 @@ export function Profile({ user, onBack, onEditProfile, onShowVerification, onUpd
                   )}
                 </div>
               </div>
+              
+              {/* Image upload success message */}
+              {imageSuccess && (
+                <div className="mb-4 text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  {imageSuccess}
+                </div>
+              )}
+              
+              {/* Image upload error message */}
+              {imageError && (
+                <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                  {imageError}
+                </div>
+              )}
               
               <input
                 ref={fileInputRef}

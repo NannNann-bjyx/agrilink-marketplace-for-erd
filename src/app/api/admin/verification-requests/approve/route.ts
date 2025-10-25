@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Verification request approved successfully' 
+      message: 'Verification request approved successfully',
+      userId: verificationRequest.userId // Include userId for client-side notification
     });
 
   } catch (error: any) {

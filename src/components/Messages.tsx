@@ -84,16 +84,24 @@ export function Messages({ currentUser, onBack, onStartChat }: MessagesProps) {
 
   // Listen for conversation updates (e.g., when offers are submitted)
   useEffect(() => {
+    console.log('🔧 Setting up conversation update event listener');
+    
     const handleConversationUpdate = (event: CustomEvent) => {
-      console.log('🔄 Conversation updated, refreshing conversations list:', event.detail);
+      console.log('🔄 Conversation updated event received:', event.detail);
+      console.log('🔄 Current user ID:', effectiveCurrentUser?.id);
       if (effectiveCurrentUser?.id) {
+        console.log('🔄 Refreshing conversations list...');
         loadConversations(effectiveCurrentUser.id);
+      } else {
+        console.log('🔄 No current user, skipping conversation refresh');
       }
     };
 
     window.addEventListener('conversationUpdated', handleConversationUpdate as EventListener);
+    console.log('✅ Event listener attached for conversationUpdated');
     
     return () => {
+      console.log('🧹 Removing conversation update event listener');
       window.removeEventListener('conversationUpdated', handleConversationUpdate as EventListener);
     };
   }, [effectiveCurrentUser?.id, loadConversations]);

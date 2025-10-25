@@ -3,6 +3,7 @@ import { db, sql } from '@/lib/db';
 import { offers as offersTable, products as productsTable, productImages, users as usersTable, userProfiles, categories, offerTimeline } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
+import { offerNotificationService } from '@/services/offerNotificationService';
 
 function verifyToken(request: NextRequest) {
   try {
@@ -170,6 +171,86 @@ export async function PUT(
     });
 
     console.log('✅ Timeline entry added for status change:', finalStatus);
+
+    // Send notifications for ALL status changes
+    try {
+      const productName = existingOffer.productName;
+      const otherPartyName = isSeller ? existingOffer.buyerName : existingOffer.sellerName;
+      const otherPartyId = isSeller ? existingOffer.buyerId : existingOffer.sellerId;
+
+      // Create notification for any status change
+      let notificationType = 'offer_created'; // default
+      let title = '';
+      let message = '';
+
+      switch (finalStatus) {
+        case 'accepted':
+          notificationType = 'offer_accepted';
+          title = 'Offer Accepted';
+          message = `${otherPartyName} accepted your offer for "${productName}"`;
+          break;
+        case 'rejected':
+          notificationType = 'offer_rejected';
+          title = 'Offer Rejected';
+          message = `${otherPartyName} rejected your offer for "${productName}"`;
+          break;
+        case 'to_ship':
+          notificationType = 'offer_created'; // We'll use a custom type
+          title = 'Ready to Ship';
+          message = `Your order for "${productName}" is ready to ship`;
+          break;
+        case 'shipped':
+          notificationType = 'offer_created'; // We'll use a custom type
+          title = 'Order Shipped';
+          message = `Your order for "${productName}" has been shipped`;
+          break;
+        case 'delivered':
+          notificationType = 'offer_created'; // We'll use a custom type
+          title = 'Order Delivered';
+          message = `Your order for "${productName}" has been delivered`;
+          break;
+        case 'received':
+          notificationType = 'offer_created'; // We'll use a custom type
+          title = 'Order Received';
+          message = `Your order for "${productName}" has been received`;
+          break;
+        case 'completed':
+          notificationType = 'offer_created'; // We'll use a custom type
+          title = 'Order Completed';
+          message = `Your order for "${productName}" has been completed`;
+          break;
+        case 'cancelled':
+          notificationType = 'offer_rejected'; // Similar to rejected
+          title = 'Order Cancelled';
+          message = `Your order for "${productName}" has been cancelled`;
+          break;
+        case 'expired':
+          notificationType = 'offer_expired';
+          title = 'Offer Expired';
+          message = `Your offer for "${productName}" has expired`;
+          break;
+        default:
+          // For any other status changes
+          title = 'Status Updated';
+          message = `Status updated to ${finalStatus} for "${productName}"`;
+      }
+
+      // Send notification to the other party
+      await offerNotificationService.createOfferNotification(
+        otherPartyId,
+        offerId,
+        notificationType as any,
+        productName,
+        isSeller ? existingOffer.sellerName : existingOffer.buyerName,
+        title,
+        message
+      );
+
+      console.log('🔔 Notification sent for offer status change:', finalStatus);
+    } catch (notificationError) {
+      console.error('❌ Failed to send notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
 
     return NextResponse.json({
       offer: {

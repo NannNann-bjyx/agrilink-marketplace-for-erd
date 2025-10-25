@@ -339,6 +339,28 @@ export const offerReviews = pgTable('offer_reviews', {
   uniqueOfferReviewer: unique().on(table.offerId, table.reviewerId),
 }));
 
+// Notifications table - In-app notifications
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  type: text('type').notNull().default('in-app'),
+  read: boolean('read').notNull().default(false),
+  link: text('link'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow(),
+});
+
+// Verification codes table for SMS verification
+export const verificationCodes = pgTable('verification_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  phone: text('phone').notNull(),
+  code: text('code').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow(),
+});
+
 // ============================================================================
 // RELATIONS
 // ============================================================================
@@ -575,3 +597,6 @@ export type NewPaymentTerm = typeof paymentTerms.$inferInsert;
 
 export type StatusType = typeof statusTypes.$inferSelect;
 export type NewStatusType = typeof statusTypes.$inferInsert;
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;

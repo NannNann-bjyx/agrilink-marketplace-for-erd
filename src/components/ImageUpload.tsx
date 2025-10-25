@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 
@@ -16,20 +16,26 @@ interface ImageUploadProps {
 export function ImageUpload({ onImageUpload, onImageSelect, currentImage, className = "", disabled = false }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(currentImage || null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Clear any previous errors
+      setError(null);
+      
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        setError('Please select an image file');
+        setTimeout(() => setError(null), 5000);
         return;
       }
 
       // Validate file size (5MB max)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size must be less than 5MB');
+        setError('Image size must be less than 5MB');
+        setTimeout(() => setError(null), 5000);
         return;
       }
 
@@ -67,7 +73,8 @@ export function ImageUpload({ onImageUpload, onImageSelect, currentImage, classN
       onImageUpload && onImageUpload(mockImageUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
+      setError('Failed to upload image. Please try again.');
+      setTimeout(() => setError(null), 5000);
       setPreview(null);
     } finally {
       setIsUploading(false);
@@ -180,6 +187,14 @@ export function ImageUpload({ onImageUpload, onImageSelect, currentImage, classN
             )}
           </CardContent>
         </Card>
+      )}
+      
+      {/* Error message */}
+      {error && (
+        <div className="mt-3 text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          {error}
+        </div>
       )}
     </div>
   );

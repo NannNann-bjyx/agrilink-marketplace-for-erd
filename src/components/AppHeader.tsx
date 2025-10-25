@@ -2,8 +2,10 @@
 
 import { Button } from "./ui/button";
 import { UserMenuWithSupport } from "./UserMenuWithSupport";
+import { OfferNotificationCenter } from "./OfferNotificationCenter";
 import { Leaf, LogIn, UserPlus } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 interface AppHeaderProps {
   currentUser?: any;
@@ -13,6 +15,54 @@ interface AppHeaderProps {
 export function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Listen for verification status changes
+  useEffect(() => {
+    const handleVerificationStatusChange = async (event: CustomEvent) => {
+      const { userId, status, message } = event.detail;
+      
+      // Only update if this is for the current user
+      if (currentUser?.id === userId) {
+        console.log('🔄 Verification status changed for current user:', { userId, status, message });
+        
+        // Refresh user data from API
+        try {
+          const token = localStorage.getItem('token');
+          if (token) {
+            const response = await fetch('/api/user/profile', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const updatedUser = data.user;
+              
+              // Update localStorage with fresh data
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              
+              // Show success message
+              if (message) {
+                alert(message);
+              }
+              
+              // Force page refresh to update all components
+              window.location.reload();
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error refreshing user data after verification change:', error);
+        }
+      }
+    };
+
+    window.addEventListener('verificationStatusChanged', handleVerificationStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('verificationStatusChanged', handleVerificationStatusChange as EventListener);
+    };
+  }, [currentUser?.id]);
 
   // Helper function to determine if a navigation button should be active
   const isActive = (path: string) => {
@@ -156,6 +206,7 @@ export function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
                 <span className="text-sm text-muted-foreground hidden lg:inline font-medium">
                   Welcome, {currentUser.name.split(" ")[0]}
                 </span>
+                <OfferNotificationCenter userId={currentUser.id} />
                 <UserMenuWithSupport
                   user={currentUser}
                   onLogout={onLogout || (() => {})}

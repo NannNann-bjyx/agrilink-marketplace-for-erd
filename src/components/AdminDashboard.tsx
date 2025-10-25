@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { PortfolioSMSCostDashboard } from './PortfolioSMSCostDashboard';
 import { 
   CheckCircle, 
   XCircle, 
@@ -80,30 +81,26 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      // Fetch total users count (excluding admins)
-      const usersResponse = await fetch('/api/admin/stats/users', {
+      // Fetch all admin stats from the main stats API
+      const statsResponse = await fetch('/api/admin/stats', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      // Fetch verification requests count
+      // Fetch verification requests for pending count
       const verificationResponse = await fetch('/api/admin/verification-requests', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      // Fetch products count
-      const productsResponse = await fetch('/api/products');
-
-      if (usersResponse.ok && verificationResponse.ok && productsResponse.ok) {
-        const usersData = await usersResponse.json();
+      if (statsResponse.ok && verificationResponse.ok) {
+        const statsData = await statsResponse.json();
         const verificationData = await verificationResponse.json();
-        const productsData = await productsResponse.json();
 
         const pendingVerifications = verificationData.requests?.filter(
-          (req: any) => req.status === 'under_review'
+          (req: any) => req.status === 'under_review' || req.verificationStatus === 'under_review'
         ).length || 0;
 
         // Fetch recent users from users API
@@ -120,9 +117,9 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
 
         // Update stats
         setStats({
-          totalUsers: usersData.count || 0,
+          totalUsers: statsData.totalUsers || 0,
           pendingVerifications,
-          totalProducts: productsData.products?.length || 0,
+          totalProducts: statsData.totalProducts || 0,
           activeTransactions: 156, // Keep mock data for now
           reportedContent: 8, // Keep mock data for now
           platformRevenue: 45670, // Keep mock data for now
@@ -268,7 +265,7 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
                   <TrendingUp className="h-4 w-4 text-indigo-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-600">Platform Revenue</p>
-                    <p className="text-2xl font-bold">${stats.platformRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{stats.platformRevenue.toLocaleString()} MMK</p>
                   </div>
                 </div>
               </CardContent>
@@ -287,7 +284,7 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
               <CardDescription>Common admin tasks</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Button 
                   variant="outline" 
                   className="h-20 flex-col gap-2"
@@ -428,8 +425,11 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
             </Card>
           </div>
 
-          {/* Bottom Row - Reported Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          {/* Bottom Row - SMS Cost Dashboard & Reported Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* SMS Cost Dashboard - Portfolio Project */}
+            <PortfolioSMSCostDashboard />
+            
             {/* Reported Content */}
             <Card>
               <CardHeader>

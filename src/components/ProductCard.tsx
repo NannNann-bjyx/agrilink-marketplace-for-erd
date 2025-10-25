@@ -6,7 +6,7 @@ import { UserBadge, PublicVerificationStatus, AccountTypeBadge, getUserVerificat
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { MapPin, MessageCircle, Store, Package, Heart } from "lucide-react";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { S3Image } from "./S3Image";
 import { getRelativeTime } from "../utils/dates";
 
 interface Product {
@@ -84,7 +84,7 @@ export function ProductCard({
         <div className="relative mb-2">
           {/* Main Product Image */}
           <div className="w-full h-48 rounded-lg overflow-hidden">
-            <ImageWithFallback
+            <S3Image
               src={product.imageUrl || "/api/placeholder/400/300"}
               alt={product.name}
               className="w-full h-full object-cover"

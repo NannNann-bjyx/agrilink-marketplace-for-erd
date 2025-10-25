@@ -14,7 +14,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
-import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { S3Avatar } from "./S3Avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Send, MapPin, Star, Shield, AlertTriangle, CheckCircle, Clock, User, X, Package, Handshake, DollarSign } from "lucide-react";
 import { useChat } from "../hooks/useChat";
@@ -52,6 +52,7 @@ interface ChatInterfaceProps {
     levelBadge: string;
   };
   product?: Product; // Full product details for offers
+  onMessagesRead?: (conversationId: string) => void; // Callback when messages are marked as read
 }
 
 export function ChatInterface({ 
@@ -71,7 +72,8 @@ export function ChatInterface({
   otherPartyProfileImage,
   otherPartyVerificationStatus,
   product,
-  currentUser: passedCurrentUser
+  currentUser: passedCurrentUser,
+  onMessagesRead
 }: ChatInterfaceProps) {
   // Use useAuth hook to get current user
   const { user: authUser, loading: authLoading } = useAuth();
@@ -193,10 +195,19 @@ export function ChatInterface({
       
       console.log('✅ Messages marked as read for conversation:', conversationId);
       
-      // Trigger conversation refresh to update unread counts
-      window.dispatchEvent(new CustomEvent('conversationUpdated', {
-        detail: { conversationId }
-      }));
+      // Call the callback to refresh conversations
+      if (onMessagesRead) {
+        console.log('🔄 Calling onMessagesRead callback for:', conversationId);
+        onMessagesRead(conversationId);
+      } else {
+        // Fallback to event dispatch if no callback provided
+        console.log('🔄 No callback provided, dispatching conversationUpdated event for:', conversationId);
+        const event = new CustomEvent('conversationUpdated', {
+          detail: { conversationId }
+        });
+        window.dispatchEvent(event);
+        console.log('✅ Event dispatched successfully');
+      }
     } catch (error) {
       console.error('❌ Error marking messages as read:', error);
     }
@@ -922,15 +933,16 @@ export function ChatInterface({
                             }}
                             className="hover:opacity-80 transition-opacity"
                           >
-                            <Avatar className="w-8 h-8">
-                              <AvatarImage
-                                src={senderImage || undefined}
-                                alt={senderName || 'User'}
-                              />
-                              <AvatarFallback className="text-xs">
-                                {senderName ? senderName.charAt(0).toUpperCase() : 'U'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <S3Avatar 
+                              src={senderImage || undefined}
+                              alt={senderName || 'User'}
+                              className="w-8 h-8"
+                              fallback={
+                                <span className="text-xs">
+                                  {senderName ? senderName.charAt(0).toUpperCase() : 'U'}
+                                </span>
+                              }
+                            />
                           </button>
                         </div>
                       )}
@@ -959,15 +971,16 @@ export function ChatInterface({
                       {/* Profile Image - Only show for sent messages */}
                       {isOwnMessage && (
                         <div className="flex-shrink-0">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage
-                              src={senderImage || undefined}
-                              alt={senderName || 'User'}
-                            />
-                            <AvatarFallback className="text-xs">
-                              {senderName ? senderName.charAt(0).toUpperCase() : 'U'}
-                            </AvatarFallback>
-                          </Avatar>
+                          <S3Avatar 
+                            src={senderImage || undefined}
+                            alt={senderName || 'User'}
+                            className="w-8 h-8"
+                            fallback={
+                              <span className="text-xs">
+                                {senderName ? senderName.charAt(0).toUpperCase() : 'U'}
+                              </span>
+                            }
+                          />
                         </div>
                       )}
                     </div>

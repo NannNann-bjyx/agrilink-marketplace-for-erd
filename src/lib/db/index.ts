@@ -29,9 +29,9 @@ const getDatabaseUrl = () => {
     return process.env.DATABASE_URL;
   }
   
-  // Fallback: Development database (for local development)
-  console.log('🎯 Using FALLBACK database');
-  return 'postgresql://neondb_owner:npg_aTAqWBZ3g7uF@ep-weathered-sea-agu2wq5l-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+  // No fallback - require explicit DATABASE_URL
+  console.log('❌ No DATABASE_URL found');
+  throw new Error('DATABASE_URL environment variable is required');
 };
 
 const databaseUrl = getDatabaseUrl();

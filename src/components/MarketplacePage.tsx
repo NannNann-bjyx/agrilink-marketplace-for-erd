@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, Filter, Package, MapPin, Star, CheckCircle } from 'lucide-react';
+import { S3Image } from './S3Image';
 
 interface Product {
   id: string;
@@ -134,7 +135,7 @@ export function MarketplacePage({ products: initialProducts }: MarketplacePagePr
               <CardHeader className="p-0">
                 <div className="aspect-square bg-gray-100 rounded-t-lg overflow-hidden">
                   {product.image ? (
-                    <img
+                    <S3Image
                       src={product.image}
                       alt={product.name}
                       className="w-full h-full object-cover"
@@ -173,7 +174,7 @@ export function MarketplacePage({ products: initialProducts }: MarketplacePagePr
                     <div className="flex items-center space-x-2">
                       <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
                         {product.seller.profileImage ? (
-                          <img
+                          <S3Image
                             src={product.seller.profileImage}
                             alt={product.seller.name}
                             className="w-8 h-8 rounded-full object-cover"

@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { smsCostMonitor } from '../services/smsCostMonitor';
 
 // Get database connection
 const getSql = () => {
@@ -48,6 +49,16 @@ class AWSSNSService {
    */
   async sendVerificationCode(userId: string, phoneNumber: string): Promise<SNSSMSResult> {
     try {
+      // Check budget before sending SMS
+      const budgetCheck = smsCostMonitor.canSendSMS();
+      if (!budgetCheck.allowed) {
+        console.log(`🚫 SMS blocked: ${budgetCheck.reason}, remaining budget: $${budgetCheck.remainingBudget.toFixed(2)}`);
+        return {
+          success: false,
+          error: budgetCheck.reason || 'Budget exceeded'
+        };
+      }
+
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
@@ -106,6 +117,9 @@ class AWSSNSService {
           });
 
           const result = await this.snsClient.send(command);
+          
+          // Log cost for portfolio monitoring
+          smsCostMonitor.logSMSCost(userId, phoneNumber, 'verification');
           
           console.log(`✅ AWS SNS SMS sent to ${phoneNumber}, MessageId: ${result.MessageId}`);
           console.log('📊 AWS SNS Full Response:', JSON.stringify(result, null, 2));

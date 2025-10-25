@@ -7,7 +7,7 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { S3Avatar } from "./S3Avatar";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -214,12 +214,16 @@ export function ReviewSliderModal({
                     {/* Review Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={currentReview.reviewer.profileImage} />
-                          <AvatarFallback>
-                            {currentReview.reviewer.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <S3Avatar 
+                          src={currentReview.reviewer.profileImage}
+                          alt={currentReview.reviewer.name}
+                          className="h-10 w-10"
+                          fallback={
+                            <span>
+                              {currentReview.reviewer.name.charAt(0).toUpperCase()}
+                            </span>
+                          }
+                        />
                         <div>
                           <div className="flex items-center space-x-2">
                             <p className="font-medium">{currentReview.reviewer.name}</p>

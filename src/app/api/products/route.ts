@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { uploadBase64Image } from '@/lib/file-upload';
 
 import jwt from 'jsonwebtoken';
 import { 
@@ -279,6 +280,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Product creation API called');
     // Check email verification for creating products
     const { user, error } = await checkEmailVerification(request, 'create_product');
     if (error) return error;
@@ -302,6 +304,7 @@ export async function POST(request: NextRequest) {
       packaging,
       unit, // Legacy field for backward compatibility
       imageUrl,
+      images,
       availableQuantity,
       minimumOrder,
       location,
@@ -515,14 +518,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert primary image if provided
-    if (imageUrl) {
-      await db.insert(productImages).values({
-        productId: newProduct[0].id,
-        imageData: imageUrl,
-        isPrimary: true,
-      });
-      console.log('✅ Primary image inserted');
+    // Upload images to S3 and insert into database
+    if (images && Array.isArray(images) && images.length > 0) {
+      console.log('📤 Uploading product images to S3...');
+      console.log('📊 Images array length:', images.length);
+      console.log('📊 First image preview:', images[0]?.substring(0, 50) + '...');
+      
+      for (let i = 0; i < images.length; i++) {
+        const imageData = images[i];
+        if (imageData && imageData.startsWith('data:')) {
+          try {
+            console.log(`📤 Uploading image ${i + 1}/${images.length} to S3 (base64 length: ${imageData.length})`);
+            const uploadedFile = await uploadBase64Image(
+              imageData, 
+              'products', 
+              `product-${newProduct[0].id}-${i + 1}.jpg`
+            );
+            console.log(`✅ S3 upload successful:`, uploadedFile);
+            
+            await db.insert(productImages).values({
+              productId: newProduct[0].id,
+              imageData: uploadedFile.filepath, // S3 key
+              isPrimary: i === 0,
+            });
+            
+            console.log(`✅ Image ${i + 1} uploaded to S3:`, uploadedFile.filepath);
+          } catch (error) {
+            console.error(`❌ Failed to upload image ${i + 1}:`, error);
+            // Continue with other images even if one fails
+          }
+        }
+      }
+    } else if (imageUrl && imageUrl.startsWith('data:')) {
+      // Handle legacy single image upload
+      try {
+        console.log('📤 Uploading legacy image to S3...');
+        const uploadedFile = await uploadBase64Image(
+          imageUrl, 
+          'products', 
+          `product-${newProduct[0].id}.jpg`
+        );
+        
+        await db.insert(productImages).values({
+          productId: newProduct[0].id,
+          imageData: uploadedFile.filepath, // S3 key
+          isPrimary: true,
+        });
+        
+        console.log('✅ Legacy image uploaded to S3:', uploadedFile.filepath);
+      } catch (error) {
+        console.error('❌ Failed to upload legacy image:', error);
+      }
     }
 
     return NextResponse.json({

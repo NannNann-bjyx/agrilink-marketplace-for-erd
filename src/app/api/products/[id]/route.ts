@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from '@/lib/db';
+import { uploadBase64Image } from '@/lib/file-upload';
 
 import jwt from 'jsonwebtoken';
 import { 
@@ -635,6 +636,7 @@ export async function PUT(
     // Update product images if provided (UPSERT - Insert or Update)
     if (body.images && Array.isArray(body.images) && body.images.length > 0) {
       console.log('🖼️ Processing images array:', body.images.length, 'images');
+      console.log('📊 First image preview:', body.images[0]?.substring(0, 50) + '...');
       console.log('🖼️ Image data preview:', body.images.map(img => ({
         length: img?.length || 0,
         isBase64: img?.startsWith('data:') || false,
@@ -664,17 +666,36 @@ export async function PUT(
                 continue;
               }
               
-              console.log(`🔍 About to insert image ${i + 1} with ${imageUrl.length} characters`);
+              console.log(`🔍 About to upload image ${i + 1} to S3 with ${imageUrl.length} characters`);
               
-              // Use Drizzle insert instead of raw SQL
-              const insertResult = await db.insert(productImages).values({
-                productId: productId,
-                imageData: imageUrl,
-                isPrimary: i === 0,
-              }).returning();
-              console.log(`✅ Inserted image ${i + 1} with ID:`, insertResult[0]?.id);
+              // Upload to S3 if it's base64 data
+              if (imageUrl.startsWith('data:')) {
+                console.log(`📤 Uploading image ${i + 1} to S3 (base64 length: ${imageUrl.length})`);
+                const uploadedFile = await uploadBase64Image(
+                  imageUrl, 
+                  'products', 
+                  `product-${productId}-${i + 1}.jpg`
+                );
+                console.log(`✅ S3 upload successful:`, uploadedFile);
+                
+                // Use Drizzle insert with S3 key
+                const insertResult = await db.insert(productImages).values({
+                  productId: productId,
+                  imageData: uploadedFile.filepath, // S3 key
+                  isPrimary: i === 0,
+                }).returning();
+                console.log(`✅ Uploaded and inserted image ${i + 1} with S3 key:`, uploadedFile.filepath);
+              } else {
+                // If it's already an S3 key or URL, store it directly
+                const insertResult = await db.insert(productImages).values({
+                  productId: productId,
+                  imageData: imageUrl,
+                  isPrimary: i === 0,
+                }).returning();
+                console.log(`✅ Inserted image ${i + 1} with ID:`, insertResult[0]?.id);
+              }
             } catch (imageError) {
-              console.error(`❌ Failed to insert image ${i + 1}:`, imageError);
+              console.error(`❌ Failed to upload/insert image ${i + 1}:`, imageError);
               // Continue with other images even if one fails
             }
           }
@@ -699,15 +720,33 @@ export async function PUT(
         if (body.image.length > 1000000) { // 1MB limit for base64
           console.log('⚠️ Single image too large, skipping:', body.image.length, 'characters');
         } else {
+          // Delete existing images
           await sql`DELETE FROM product_images WHERE "productId" = ${productId}`;
-          await sql`
-            INSERT INTO product_images ("productId", "imageData", "isPrimary", "createdAt")
-            VALUES (${productId}, ${body.image}, true, NOW())
-          `;
-          console.log('✅ Updated product image (legacy)');
+          
+          // Upload to S3 if it's base64 data
+          if (body.image.startsWith('data:')) {
+            const uploadedFile = await uploadBase64Image(
+              body.image, 
+              'products', 
+              `product-${productId}.jpg`
+            );
+            
+            await sql`
+              INSERT INTO product_images ("productId", "imageData", "isPrimary", "createdAt")
+              VALUES (${productId}, ${uploadedFile.filepath}, true, NOW())
+            `;
+            console.log('✅ Updated product image (legacy) with S3 key:', uploadedFile.filepath);
+          } else {
+            // If it's already an S3 key or URL, store it directly
+            await sql`
+              INSERT INTO product_images ("productId", "imageData", "isPrimary", "createdAt")
+              VALUES (${productId}, ${body.image}, true, NOW())
+            `;
+            console.log('✅ Updated product image (legacy)');
+          }
         }
       } catch (imageError) {
-        console.error('❌ Failed to insert single image:', imageError);
+        console.error('❌ Failed to upload/insert single image:', imageError);
         // Don't fail the entire request if image insertion fails
       }
     }

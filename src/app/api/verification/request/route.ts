@@ -91,56 +91,89 @@ export async function POST(request: NextRequest) {
         
         // Process ID Card document
         if (verificationDocuments.idCard?.data) {
-          console.log('📄 Uploading ID card document...');
-          const idCardFile = await uploadBase64Image(
-            verificationDocuments.idCard.data,
-            'verification',
-            verificationDocuments.idCard.name || 'id-card'
-          );
-          uploadedDocs.idCard = {
-            ...verificationDocuments.idCard,
-            data: idCardFile.filepath, // Replace base64 with file path
-            filename: idCardFile.filename,
-            originalName: idCardFile.originalName,
-            size: idCardFile.size,
-            mimeType: idCardFile.mimeType
-          };
+          console.log('📄 Processing ID card document...');
+          
+          // Check if it's already an S3 key (doesn't start with 'data:')
+          if (!verificationDocuments.idCard.data.startsWith('data:')) {
+            console.log('📄 ID card is already an S3 key, using as-is');
+            uploadedDocs.idCard = {
+              ...verificationDocuments.idCard,
+              // Keep the S3 key as-is
+            };
+          } else {
+            console.log('📄 ID card is base64 data, uploading to S3...');
+            const idCardFile = await uploadBase64Image(
+              verificationDocuments.idCard.data,
+              'verification',
+              verificationDocuments.idCard.name || 'id-card'
+            );
+            uploadedDocs.idCard = {
+              ...verificationDocuments.idCard,
+              data: idCardFile.filepath, // Replace base64 with S3 key
+              filename: idCardFile.filename,
+              originalName: idCardFile.originalName,
+              size: idCardFile.size,
+              mimeType: idCardFile.mimeType
+            };
+          }
         }
         
         // Process Business License document
         if (verificationDocuments.businessLicense?.data) {
-          console.log('📄 Uploading business license document...');
-          const businessLicenseFile = await uploadBase64Image(
-            verificationDocuments.businessLicense.data,
-            'verification',
-            verificationDocuments.businessLicense.name || 'business-license'
-          );
-          uploadedDocs.businessLicense = {
-            ...verificationDocuments.businessLicense,
-            data: businessLicenseFile.filepath, // Replace base64 with file path
-            filename: businessLicenseFile.filename,
-            originalName: businessLicenseFile.originalName,
-            size: businessLicenseFile.size,
-            mimeType: businessLicenseFile.mimeType
-          };
+          console.log('📄 Processing business license document...');
+          
+          // Check if it's already an S3 key (doesn't start with 'data:')
+          if (!verificationDocuments.businessLicense.data.startsWith('data:')) {
+            console.log('📄 Business license is already an S3 key, using as-is');
+            uploadedDocs.businessLicense = {
+              ...verificationDocuments.businessLicense,
+              // Keep the S3 key as-is
+            };
+          } else {
+            console.log('📄 Business license is base64 data, uploading to S3...');
+            const businessLicenseFile = await uploadBase64Image(
+              verificationDocuments.businessLicense.data,
+              'verification',
+              verificationDocuments.businessLicense.name || 'business-license'
+            );
+            uploadedDocs.businessLicense = {
+              ...verificationDocuments.businessLicense,
+              data: businessLicenseFile.filepath, // Replace base64 with S3 key
+              filename: businessLicenseFile.filename,
+              originalName: businessLicenseFile.originalName,
+              size: businessLicenseFile.size,
+              mimeType: businessLicenseFile.mimeType
+            };
+          }
         }
         
         // Process Farm Certification document (if exists)
         if (verificationDocuments.farmCertification?.data) {
-          console.log('📄 Uploading farm certification document...');
-          const farmCertFile = await uploadBase64Image(
-            verificationDocuments.farmCertification.data,
-            'verification',
-            verificationDocuments.farmCertification.name || 'farm-certification'
-          );
-          uploadedDocs.farmCertification = {
-            ...verificationDocuments.farmCertification,
-            data: farmCertFile.filepath, // Replace base64 with file path
-            filename: farmCertFile.filename,
-            originalName: farmCertFile.originalName,
-            size: farmCertFile.size,
-            mimeType: farmCertFile.mimeType
-          };
+          console.log('📄 Processing farm certification document...');
+          
+          // Check if it's already an S3 key (doesn't start with 'data:')
+          if (!verificationDocuments.farmCertification.data.startsWith('data:')) {
+            console.log('📄 Farm certification is already an S3 key, using as-is');
+            uploadedDocs.farmCertification = {
+              ...verificationDocuments.farmCertification,
+              // Keep the S3 key as-is
+            };
+          } else {
+            console.log('📄 Farm certification is base64 data, uploading to S3...');
+            const farmCertFile = await uploadBase64Image(
+              verificationDocuments.farmCertification.data,
+              'verification',
+              verificationDocuments.farmCertification.name || 'farm-certification'
+            );
+            uploadedDocs.farmCertification = {
+              ...verificationDocuments.farmCertification,
+              data: farmCertFile.filepath, // Replace base64 with S3 key
+              filename: farmCertFile.filename,
+              originalName: farmCertFile.originalName,
+              size: farmCertFile.size,
+              mimeType: farmCertFile.mimeType
+            };
+          }
         }
         
         processedVerificationDocuments = uploadedDocs;

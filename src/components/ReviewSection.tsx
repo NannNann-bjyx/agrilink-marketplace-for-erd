@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import { S3Avatar } from './S3Avatar';
 import { 
   Star, 
   MessageSquare, 
@@ -367,12 +367,16 @@ export function ReviewSection({
               {allReviews.slice(0, 3).map((review) => (
                 <div key={review.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={review.reviewer.profileImage} />
-                      <AvatarFallback>
-                        {review.reviewer.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <S3Avatar 
+                      src={review.reviewer.profileImage}
+                      alt={review.reviewer.name}
+                      className="w-8 h-8"
+                      fallback={
+                        <span>
+                          {review.reviewer.name.charAt(0).toUpperCase()}
+                        </span>
+                      }
+                    />
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -430,12 +434,14 @@ export function ReviewSection({
             {reviews.map((review) => (
               <div key={review.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={review.reviewer.profileImage} />
-                    <AvatarFallback>
+                  <S3Avatar 
+                    src={review.reviewer.profileImage}
+                    alt={review.reviewer.name}
+                    className="w-10 h-10"
+                    fallback={
                       <User className="w-5 h-5" />
-                    </AvatarFallback>
-                  </Avatar>
+                    }
+                  />
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

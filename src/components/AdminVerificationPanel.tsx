@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from "./ui/alert";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
-import { Separator } from "./ui/separator";
+import { S3Image } from './S3Image';
+import { Separator } from './ui/separator';
 import { 
   CheckCircle, 
   XCircle, 
@@ -78,13 +79,178 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
   const [isProcessing, setIsProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<{name: string, data: string, type: string} | null>(null);
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Helper function to create a shorter, more user-friendly display name
+  const createDisplayName = (filename: string, maxLength: number = 25): string => {
+    if (!filename) return 'Unknown file';
+    
+    // Remove common prefixes that make filenames long
+    let cleanName = filename
+      .replace(/^Gemini_Generated_Image_/i, '')
+      .replace(/^generated_image_/i, '')
+      .replace(/^image_/i, '')
+      .replace(/^document_/i, '')
+      .replace(/^file_/i, '');
+    
+    // If still too long, truncate intelligently
+    if (cleanName.length > maxLength) {
+      const extension = cleanName.split('.').pop();
+      const nameWithoutExt = cleanName.substring(0, cleanName.lastIndexOf('.'));
+      const truncatedName = nameWithoutExt.substring(0, maxLength - extension.length - 4); // -4 for "..."
+      return `${truncatedName}...${extension ? '.' + extension : ''}`;
+    }
+    
+    return cleanName;
+  };
+
+  // Helper function to handle document viewing (S3 keys or base64 data)
+  const handleDocumentView = async (documentData: string, documentName: string) => {
+    try {
+      // Check if it's an S3 key (doesn't start with 'data:' or 'http')
+      if (!documentData.startsWith('data:') && !documentData.startsWith('http')) {
+        // S3 key format - generate presigned URL
+        const response = await fetch('/api/s3/generate-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ s3Key: documentData }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to generate presigned URL');
+        }
+        
+        const data = await response.json();
+        const presignedUrl = data.presignedUrl;
+        
+        // Determine file type from S3 key
+        const fileExtension = documentData.split('.').pop()?.toLowerCase();
+        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+        
+        setPreviewDocument({
+          name: documentName,
+          data: presignedUrl,
+          type: isImage ? 'image' : 'document'
+        });
+        setShowDocumentPreview(true);
+        return;
+      }
+      
+      // Handle base64 data or direct URL
+      const fileExtension = documentName.split('.').pop()?.toLowerCase();
+      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+      
+      setPreviewDocument({
+        name: documentName,
+        data: documentData,
+        type: isImage ? 'image' : 'document'
+      });
+      setShowDocumentPreview(true);
+    } catch (error) {
+      console.error('View failed:', error);
+      alert('Failed to view document');
+    }
+  };
+
+  // Helper function to handle document downloads (S3 keys or base64 data)
+  const handleDocumentDownload = async (documentData: string, fileName: string) => {
+    try {
+      console.log('📥 Starting download for:', fileName, 'Data type:', typeof documentData);
+      
+      // Check if it's an S3 key (doesn't start with 'data:' or 'http')
+      if (!documentData.startsWith('data:') && !documentData.startsWith('http')) {
+        console.log('🔑 Using server-side download for S3 key:', documentData);
+        
+        // Use server-side download proxy to avoid CORS issues
+        const response = await fetch('/api/s3/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            s3Key: documentData,
+            filename: fileName 
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server download failed: ${response.status} ${response.statusText}`);
+        }
+        
+        console.log('📦 Creating blob from server response');
+        const blob = await response.blob();
+        console.log('✅ Blob created, size:', blob.size, 'type:', blob.type);
+        
+        // Create blob URL and force download
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('🔗 Created blob URL:', blobUrl);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        
+        console.log('⬇️ Triggering download');
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL
+        URL.revokeObjectURL(blobUrl);
+        console.log('✅ Download completed successfully');
+        
+      } else {
+        // Handle direct URLs or base64 data
+        console.log('📡 Using direct download for URL/data');
+        
+        let downloadUrl = documentData;
+        
+        // If it's base64 data, convert to blob
+        if (documentData.startsWith('data:')) {
+          const response = await fetch(documentData);
+          const blob = await response.blob();
+          downloadUrl = URL.createObjectURL(blob);
+        }
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        
+        console.log('⬇️ Triggering direct download');
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL if we created one
+        if (documentData.startsWith('data:')) {
+          URL.revokeObjectURL(downloadUrl);
+        }
+        
+        console.log('✅ Direct download completed successfully');
+      }
+      
+    } catch (error) {
+      console.error('❌ Download failed:', error);
+      alert(`Failed to download document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   // Load verification requests from Neon database
-  const loadRequests = async () => {
+  const loadRequests = async (forceRefresh = false) => {
     try {
       setLoading(true);
       
-      const response = await fetch('/api/admin/verification-requests', {
+      const url = forceRefresh 
+        ? '/api/admin/verification-requests?refresh=true'
+        : '/api/admin/verification-requests';
+        
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -128,11 +294,24 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
       }));
 
       setRequests(transformedRequests);
+      setLastRefresh(new Date());
+      
+      // Log performance info
+      if (data.cached) {
+        console.log('📦 Loaded from cache');
+      } else {
+        console.log('💾 Loaded from database');
+      }
     } catch (error) {
       console.error('❌ Failed to load verification requests:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Force refresh function
+  const handleRefresh = () => {
+    loadRequests(true);
   };
 
   useEffect(() => {
@@ -158,51 +337,30 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
         throw new Error('Failed to approve request');
       }
 
-      // Refresh requests
-      const refreshResponse = await fetch('/api/admin/verification-requests', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const responseData = await response.json();
+      console.log('✅ Admin approval response:', responseData);
 
-      if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        const requests = data.requests || [];
-        
-        const transformedRequests: VerificationRequest[] = requests.map((req: any) => ({
-          id: req.id,
-          userId: req.userId,
-          userEmail: req.userEmail,
-          userName: req.userName,
-          userType: req.userType,
-          accountType: req.accountType,
-          verificationStatus: req.status === 'under_review' ? 'under_review' : 
-                             req.status === 'approved' ? 'verified' : 
-                             req.status === 'rejected' ? 'rejected' : 'under_review',
-          verificationSubmitted: true,
-          verificationDocuments: req.user_verification_documents || req.verification_request_documents || {},
-          businessInfo: {
-            businessName: req.businessName || req.user_business_name,
-            businessDescription: req.businessDescription || req.user_business_description,
-            location: req.location,
-            region: req.businessInfo?.region,
-          },
-          phoneVerified: req.user_phone_verified || req.verification_phone_verified || false,
-          submittedAt: req.submittedAt || req.submitted_at,
-          type: req.accountType === 'business' ? 'Business Account' : 'Individual Account',
-          status: req.status,
-          documents: req.user_verification_documents || req.verification_request_documents || {},
-          businessType: req.accountType,
-          business_name: req.businessName || req.user_business_name,
-          business_description: req.businessDescription || req.user_business_description,
-          business_license_number: req.businessLicenseNumber || req.user_business_license_number,
+      // Dispatch event to notify user of verification status change
+      if (responseData.userId) {
+        console.log('🔄 Dispatching verificationStatusChanged event for user:', responseData.userId);
+        window.dispatchEvent(new CustomEvent('verificationStatusChanged', {
+          detail: { 
+            userId: responseData.userId,
+            status: 'verified',
+            message: 'Your verification has been approved!'
+          }
         }));
-
-        setRequests(transformedRequests);
       }
 
-      setSelectedRequest(null);
+      // Close dialog and refresh data
+      setIsDialogOpen(false);
       setReviewNotes('');
+      setSelectedRequest(null);
+      
+      // Refresh the requests list to show updated status
+      console.log('🔄 Refreshing admin panel data after approval...');
+      await loadRequests(true);
+      
       alert('Verification request approved successfully!');
     } catch (error) {
       console.error('Error approving request:', error);
@@ -232,15 +390,29 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
         throw new Error(errorData.error || `HTTP ${response.status}: Failed to reject request`);
       }
 
-      // Refresh requests
-      setRequests(prev => prev.map(req => 
-        req.id === requestId 
-          ? { ...req, verificationStatus: 'rejected', status: 'rejected' }
-          : req
-      ));
+      const responseData = await response.json();
+      console.log('❌ Admin rejection response:', responseData);
 
+      // Dispatch event to notify user of verification status change
+      if (responseData.userId) {
+        console.log('🔄 Dispatching verificationStatusChanged event for user:', responseData.userId);
+        window.dispatchEvent(new CustomEvent('verificationStatusChanged', {
+          detail: { 
+            userId: responseData.userId,
+            status: 'rejected',
+            message: 'Your verification request has been rejected. Please check the feedback and resubmit if needed.'
+          }
+        }));
+      }
+
+      // Close dialog and refresh data
       setSelectedRequest(null);
       setReviewNotes('');
+      
+      // Refresh the requests list to show updated status
+      console.log('🔄 Refreshing admin panel data after rejection...');
+      await loadRequests(true);
+      
       alert('Verification request rejected successfully');
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -297,16 +469,19 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Verification Requests</h2>
-          <p className="text-gray-600">Review and manage user verification requests</p>
+          <p className="text-gray-600">
+            Review and manage user verification requests
+            {lastRefresh && (
+              <span className="text-sm text-gray-500 ml-2">
+                • Last updated: {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
-            onClick={async () => {
-              setLoading(true);
-              await loadRequests();
-              setLoading(false);
-            }}
+            onClick={handleRefresh}
             disabled={loading}
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -399,7 +574,9 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
                         </div>
                       </div>
                     </div>
-                    <Dialog open={isDialogOpen && selectedRequest?.id === request.id} onOpenChange={(open) => {
+                    <Dialog 
+                      open={isDialogOpen && selectedRequest?.id === request.id} 
+                      onOpenChange={(open) => {
                       if (!open) {
                         setIsDialogOpen(false);
                         setSelectedRequest(null);
@@ -419,7 +596,10 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
                           Review
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <DialogContent 
+          className="max-w-[45vw] w-[45vw] max-h-[90vh] overflow-y-auto overflow-x-hidden !max-w-[45vw] !w-[45vw]"
+          style={{ maxWidth: '45vw', width: '45vw' }}
+        >
                         <DialogHeader>
                           <DialogTitle>Review Verification Request</DialogTitle>
                           <DialogDescription>
@@ -498,36 +678,49 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
                             <Label className="text-sm font-medium">Uploaded Documents</Label>
                             <div className="mt-2 space-y-3">
                               {request.verificationDocuments?.idCard && (
-                                <div className="border rounded-lg p-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <FileText className="w-4 h-4 text-blue-600" />
-                                      <span className="text-sm font-medium">ID Card</span>
-                                      <Badge variant="outline" className="text-xs">
+                                <div className="border rounded-lg p-3 min-w-0 max-w-full overflow-hidden">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                      <span className="text-sm font-medium flex-shrink-0">ID Card</span>
+                                      <Badge variant="outline" className="text-xs flex-shrink-0">
                                         {request.verificationDocuments.idCard.status}
                                       </Badge>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <div className="text-xs text-gray-500">
-                                        {request.verificationDocuments.idCard.name}
+                                      <div className="text-xs text-gray-500 truncate flex-1 min-w-0 ml-2" title={request.verificationDocuments.idCard.name}>
+                                        {createDisplayName(request.verificationDocuments.idCard.name, 20)}
                                       </div>
+                                    </div>
+                                    <div className="flex-shrink-0">
                                       {request.verificationDocuments.idCard.data ? (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.href = request.verificationDocuments?.idCard?.data || '';
-                                            link.download = request.verificationDocuments?.idCard?.name || 'id-card';
-                                            link.click();
-                                          }}
-                                        >
-                                          <Download className="w-3 h-3 mr-1" />
-                                          Download
-                                        </Button>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDocumentView(
+                                              request.verificationDocuments?.idCard?.data || '',
+                                              request.verificationDocuments?.idCard?.name || 'id-card'
+                                            )}
+                                            className="text-xs px-2 py-1 h-6"
+                                            title="View document"
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDocumentDownload(
+                                              request.verificationDocuments?.idCard?.data || '',
+                                              request.verificationDocuments?.idCard?.name || 'id-card'
+                                            )}
+                                            className="text-xs px-2 py-1 h-6"
+                                            title="Download document"
+                                          >
+                                            <Download className="w-3 h-3" />
+                                          </Button>
+                                        </div>
                                       ) : (
-                                        <div className="text-xs text-gray-400">
-                                          File content not stored
+                                        <div className="text-xs text-gray-400 text-[10px]">
+                                          No file
                                         </div>
                                       )}
                                     </div>
@@ -540,36 +733,49 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
                               )}
 
                               {request.verificationDocuments?.businessLicense && (
-                                <div className="border rounded-lg p-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <FileText className="w-4 h-4 text-green-600" />
-                                      <span className="text-sm font-medium">Business License</span>
-                                      <Badge variant="outline" className="text-xs">
+                                <div className="border rounded-lg p-3 min-w-0 max-w-full overflow-hidden">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <FileText className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                      <span className="text-sm font-medium flex-shrink-0">Business License</span>
+                                      <Badge variant="outline" className="text-xs flex-shrink-0">
                                         {request.verificationDocuments.businessLicense.status}
                                       </Badge>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <div className="text-xs text-gray-500">
-                                        {request.verificationDocuments.businessLicense.name}
+                                      <div className="text-xs text-gray-500 truncate flex-1 min-w-0 ml-2" title={request.verificationDocuments.businessLicense.name}>
+                                        {createDisplayName(request.verificationDocuments.businessLicense.name, 20)}
                                       </div>
+                                    </div>
+                                    <div className="flex-shrink-0">
                                       {request.verificationDocuments.businessLicense.data ? (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            const link = document.createElement('a');
-                                            link.href = request.verificationDocuments?.businessLicense?.data || '';
-                                            link.download = request.verificationDocuments?.businessLicense?.name || 'business-license';
-                                            link.click();
-                                          }}
-                                        >
-                                          <Download className="w-3 h-3 mr-1" />
-                                          Download
-                                        </Button>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDocumentView(
+                                              request.verificationDocuments?.businessLicense?.data || '',
+                                              request.verificationDocuments?.businessLicense?.name || 'business-license'
+                                            )}
+                                            className="text-xs px-2 py-1 h-6"
+                                            title="View document"
+                                          >
+                                            <Eye className="w-3 h-3" />
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDocumentDownload(
+                                              request.verificationDocuments?.businessLicense?.data || '',
+                                              request.verificationDocuments?.businessLicense?.name || 'business-license'
+                                            )}
+                                            className="text-xs px-2 py-1 h-6"
+                                            title="Download document"
+                                          >
+                                            <Download className="w-3 h-3" />
+                                          </Button>
+                                        </div>
                                       ) : (
-                                        <div className="text-xs text-gray-400">
-                                          File content not stored
+                                        <div className="text-xs text-gray-400 text-[10px]">
+                                          No file
                                         </div>
                                       )}
                                     </div>
@@ -681,6 +887,52 @@ export function AdminVerificationPanel({ currentAdmin, onBack }: AdminVerificati
             <p className="text-gray-600">No verification requests have been submitted yet.</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Document Preview Modal */}
+      {showDocumentPreview && previewDocument && (
+        <Dialog open={showDocumentPreview} onOpenChange={setShowDocumentPreview}>
+          <DialogContent 
+          className="max-w-[45vw] w-[45vw] max-h-[90vh] overflow-y-auto overflow-x-hidden !max-w-[45vw] !w-[45vw]"
+          style={{ maxWidth: '45vw', width: '45vw' }}
+        >
+            <DialogHeader>
+              <DialogTitle>Document Preview</DialogTitle>
+              <DialogDescription>
+                {previewDocument.name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="mt-4">
+              {previewDocument.type === 'image' ? (
+                <img 
+                  src={previewDocument.data} 
+                  alt={previewDocument.name}
+                  className="max-w-full h-auto mx-auto"
+                  style={{ maxHeight: '70vh' }}
+                />
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 mb-4">Document Preview</p>
+                  <iframe
+                    src={previewDocument.data}
+                    className="w-full h-96 border"
+                    title={previewDocument.name}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowDocumentPreview(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

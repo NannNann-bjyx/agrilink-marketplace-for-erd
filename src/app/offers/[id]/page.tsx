@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { S3Image } from "@/components/S3Image";
 import { 
   ChevronLeft,
   Package, 
@@ -268,6 +269,14 @@ export default function OfferDetailsPage() {
     }));
   };
 
+  // Helper function to check if offer is expired and return correct status
+  const getEffectiveStatus = (offer: OfferDetails) => {
+    if (offer.status === 'pending' && offer.expiresAt && new Date(offer.expiresAt) < new Date()) {
+      return 'expired';
+    }
+    return offer.status;
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4 text-yellow-600" />;
@@ -421,7 +430,7 @@ export default function OfferDetailsPage() {
                 <div className="flex items-start gap-4">
                   <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                     {offer.productImage ? (
-                      <img 
+                      <S3Image 
                         src={offer.productImage} 
                         alt={offer.productName}
                         className="w-full h-full object-cover"
@@ -458,7 +467,7 @@ export default function OfferDetailsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {offer.expiresAt && offer.status === 'pending' && (
+                {offer.expiresAt && getEffectiveStatus(offer) === 'pending' && (
                   <div>
                     <label className="text-sm font-medium text-gray-700">Expires</label>
                     <p className="text-gray-900">{formatDate(offer.expiresAt)}</p>
@@ -532,7 +541,7 @@ export default function OfferDetailsPage() {
               <OfferStatusManager
                 offer={{
                   id: offer.id,
-                  status: offer.status,
+                  status: getEffectiveStatus(offer),
                   statusUpdatedAt: offer.statusUpdatedAt || offer.updatedAt,
                   shippedAt: offer.shippedAt,
                   receivedAt: offer.deliveredAt,
@@ -552,7 +561,7 @@ export default function OfferDetailsPage() {
             )}
 
             {/* Reviews Section - Only for completed offers */}
-            {offer.status === 'completed' && (
+            {getEffectiveStatus(offer) === 'completed' && (
               <ReviewSection
                 offerId={offer.id}
                 currentUserId={user.id}
@@ -581,7 +590,7 @@ export default function OfferDetailsPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center overflow-hidden">
                     {otherParty.image ? (
-                      <img 
+                      <S3Image 
                         src={otherParty.image} 
                         alt={otherParty.name}
                         className="w-full h-full object-cover"

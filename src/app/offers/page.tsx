@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { S3Image } from "@/components/S3Image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -137,6 +138,14 @@ export default function OffersPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to check if offer is expired and return correct status
+  const getEffectiveStatus = (offer: Offer) => {
+    if (offer.status === 'pending' && offer.expiresAt && new Date(offer.expiresAt) < new Date()) {
+      return 'expired';
+    }
+    return offer.status;
   };
 
   const getStatusIcon = (status: string) => {
@@ -284,7 +293,7 @@ export default function OffersPage() {
                           {/* Product Image */}
                           <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                             {offer.product?.image ? (
-                              <img 
+                              <S3Image 
                                 src={offer.product.image} 
                                 alt={offer.product.name}
                                 className="w-full h-full object-cover"
@@ -320,7 +329,7 @@ export default function OffersPage() {
                                   <Calendar className="w-4 h-4" />
                                   <span>Sent: {formatDate(offer.createdAt)}</span>
                                 </div>
-                                {offer.expiresAt && offer.status === 'pending' && (
+                                {offer.expiresAt && getEffectiveStatus(offer) === 'pending' && (
                                   <div className="flex items-center gap-2">
                                     <Clock className="w-4 h-4" />
                                     <span>Expires: {formatDate(offer.expiresAt)}</span>
@@ -340,9 +349,9 @@ export default function OffersPage() {
                         {/* Actions */}
                         <div className="flex flex-col gap-2 ml-4">
                           <div className="flex items-center gap-2">
-                            <Badge className={getStatusColor(offer.status)}>
-                              {getStatusIcon(offer.status)}
-                              <span className="ml-1">{formatStatus(offer.status)}</span>
+                            <Badge className={getStatusColor(getEffectiveStatus(offer))}>
+                              {getStatusIcon(getEffectiveStatus(offer))}
+                              <span className="ml-1">{formatStatus(getEffectiveStatus(offer))}</span>
                             </Badge>
                             <Button
                               variant="outline"
@@ -391,7 +400,7 @@ export default function OffersPage() {
                           {/* Product Image */}
                           <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
                             {offer.product?.image ? (
-                              <img 
+                              <S3Image 
                                 src={offer.product.image} 
                                 alt={offer.product.name}
                                 className="w-full h-full object-cover"
@@ -427,7 +436,7 @@ export default function OffersPage() {
                                   <Calendar className="w-4 h-4" />
                                   <span>Received: {formatDate(offer.createdAt)}</span>
                                 </div>
-                                {offer.expiresAt && offer.status === 'pending' && (
+                                {offer.expiresAt && getEffectiveStatus(offer) === 'pending' && (
                                   <div className="flex items-center gap-2">
                                     <Clock className="w-4 h-4" />
                                     <span>Expires: {formatDate(offer.expiresAt)}</span>
@@ -447,9 +456,9 @@ export default function OffersPage() {
                         {/* Actions */}
                         <div className="flex flex-col gap-2 ml-4">
                           <div className="flex items-center gap-2">
-                            <Badge className={getStatusColor(offer.status)}>
-                              {getStatusIcon(offer.status)}
-                              <span className="ml-1">{formatStatus(offer.status)}</span>
+                            <Badge className={getStatusColor(getEffectiveStatus(offer))}>
+                              {getStatusIcon(getEffectiveStatus(offer))}
+                              <span className="ml-1">{formatStatus(getEffectiveStatus(offer))}</span>
                             </Badge>
                             <Button
                               variant="outline"

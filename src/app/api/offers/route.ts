@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
+import { offerNotificationService } from '@/services/offerNotificationService';
 import jwt from 'jsonwebtoken';
 
 
@@ -473,6 +473,21 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date()
       })
       .where(eq(conversations.id, conversationId));
+
+    // Send notification to seller about new offer
+    try {
+      await offerNotificationService.createOfferNotification(
+        productData.sellerId,
+        newOffer[0].id,
+        'offer_created',
+        productData.name,
+        user.name || 'Unknown User'
+      );
+      console.log('🔔 Notification sent for new offer creation');
+    } catch (notificationError) {
+      console.error('❌ Failed to send offer creation notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
 
     return NextResponse.json({
       offer: {

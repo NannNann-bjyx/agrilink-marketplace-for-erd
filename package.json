@@ -13,11 +13,16 @@
     "db:studio": "drizzle-kit studio",
     "db:setup": "node setup-nextjs-database.js",
     "db:twilio": "node migrate-to-twilio.js",
-    "db:twilio-override": "psql $DATABASE_URL -f prepare-twilio-override-database.sql"
+    "db:twilio-override": "psql $DATABASE_URL -f prepare-twilio-override-database.sql",
+    "cleanup-s3": "npx tsx scripts/cleanup-s3-images.ts --delete",
+    "list-s3": "npx tsx scripts/cleanup-s3-images.ts",
+    "reset-db-images": "npx tsx scripts/reset-database-images.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.916.0",
     "@aws-sdk/client-ses": "^3.907.0",
     "@aws-sdk/client-sns": "^3.911.0",
+    "@aws-sdk/s3-request-presigner": "^3.916.0",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -73,7 +78,7 @@
     "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
-    "twilio": "^5.10.2",
+    "twilio": "^5.10.3",
     "vaul": "^1.1.2"
   },
   "devDependencies": {

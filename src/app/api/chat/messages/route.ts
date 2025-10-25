@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, sql } from '@/lib/db';
 import { messages as messagesTable, conversations as conversationsTable } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
 // Helper function to verify JWT token
@@ -194,14 +194,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Mark all messages in the conversation as read for the current user
+    // Only mark messages that are not from the current user as read
     await db
       .update(messagesTable)
       .set({ isRead: true })
       .where(
         and(
           eq(messagesTable.conversationId, conversationId),
-          // Only mark messages that are not from the current user as read
-          // (don't mark own messages as read)
+          ne(messagesTable.senderId, user.id) // Only mark messages from other users as read
         )
       );
 
