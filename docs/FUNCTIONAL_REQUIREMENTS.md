@@ -257,6 +257,24 @@ The functional requirements cover all user-facing features and system capabiliti
 - **FR-131 (M):** System shall support chat themes
 - **FR-132 (M):** System shall allow chat customization
 
+### 4.3 Notification System Functions
+
+#### 4.3.1 Real-time Notifications
+- **FR-133 (S):** System shall provide real-time in-app notifications
+- **FR-134 (S):** System shall notify users of offer status changes
+- **FR-135 (S):** System shall notify users of new messages
+- **FR-136 (S):** System shall notify users of verification status updates
+- **FR-137 (S):** System shall display notification counts in UI
+- **FR-138 (S):** System shall allow users to mark notifications as read
+
+#### 4.3.2 Notification Management
+- **FR-139 (S):** System shall maintain notification history
+- **FR-140 (S):** System shall allow users to view all notifications
+- **FR-141 (S):** System shall support notification filtering
+- **FR-142 (S):** System shall allow notification deletion
+- **FR-143 (S):** System shall track notification delivery status
+- **FR-144 (S):** System shall support notification preferences
+
 ---
 
 ## 5. Offer Management Functions
@@ -264,13 +282,13 @@ The functional requirements cover all user-facing features and system capabiliti
 ### 5.1 Offer Creation Functions
 
 #### 5.1.1 Offer Submission
-- **FR-133 (M):** System shall allow buyers to make offers on products
-- **FR-134 (M):** System shall require offer price and quantity
-- **FR-135 (M):** System shall allow offer messages
-- **FR-136 (M):** System shall specify delivery address
-- **FR-137 (M):** System shall select delivery options
-- **FR-138 (M):** System shall specify payment terms
-- **FR-139 (M):** System shall set offer expiration dates
+- **FR-145 (M):** System shall allow buyers to make offers on products
+- **FR-146 (M):** System shall require offer price and quantity
+- **FR-147 (M):** System shall allow offer messages
+- **FR-148 (M):** System shall specify delivery address
+- **FR-149 (M):** System shall select delivery options
+- **FR-150 (M):** System shall specify payment terms
+- **FR-151 (M):** System shall set offer expiration dates
 
 #### 5.1.2 Offer Validation
 - **FR-140 (M):** System shall validate offer amounts
@@ -425,12 +443,12 @@ The functional requirements cover all user-facing features and system capabiliti
 |----------|-------------------|----------------------|
 | **User Management** | 53 requirements | 35M, 15S, 3C |
 | **Product Management** | 58 requirements | 40M, 15S, 3C |
-| **Communication** | 30 requirements | 20M, 8S, 2C |
+| **Communication** | 44 requirements | 20M, 20S, 4C |
 | **Offer Management** | 37 requirements | 25M, 10S, 2C |
 | **Administrative** | 36 requirements | 25M, 8S, 3C |
 | **Reporting** | 15 requirements | 8M, 5S, 2C |
 | **Integration** | 10 requirements | 6M, 3S, 1C |
-| **Total** | **239 requirements** | **159M, 64S, 16C** |
+| **Total** | **253 requirements** | **159M, 76S, 18C** |
 
 ---
 

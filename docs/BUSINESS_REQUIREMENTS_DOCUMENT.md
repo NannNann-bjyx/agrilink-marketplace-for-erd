@@ -234,31 +234,37 @@ AgriLink provides a comprehensive digital marketplace that:
 - **BR-011:** Platform must support dispute resolution
 - **BR-012:** System must maintain transaction records
 
-#### 6.1.4 Business Intelligence
-- **BR-013:** Platform must provide market analytics
-- **BR-014:** System must support business reporting
-- **BR-015:** Platform must offer performance metrics
-- **BR-016:** System must enable trend analysis
+#### 6.1.4 User Engagement and Communication
+- **BR-013:** Platform must provide real-time notifications for offer updates
+- **BR-014:** System must notify users of important status changes
+- **BR-015:** Platform must support in-app notification management
+- **BR-016:** System must enhance user engagement through timely updates
+
+#### 6.1.5 Business Intelligence
+- **BR-017:** Platform must provide market analytics
+- **BR-018:** System must support business reporting
+- **BR-019:** Platform must offer performance metrics
+- **BR-020:** System must enable trend analysis
 
 ### 6.2 Non-Functional Business Requirements
 
 #### 6.2.1 Performance
-- **BR-017:** Platform must handle 1000+ concurrent users
-- **BR-018:** System must respond within 3 seconds
-- **BR-019:** Platform must maintain 99.5% uptime
-- **BR-020:** System must support mobile devices
+- **BR-021:** Platform must handle 1000+ concurrent users
+- **BR-022:** System must respond within 3 seconds
+- **BR-023:** Platform must maintain 99.5% uptime
+- **BR-024:** System must support mobile devices
 
 #### 6.2.2 Security
-- **BR-021:** Platform must protect user data
-- **BR-022:** System must prevent fraud
-- **BR-023:** Platform must ensure transaction security
-- **BR-024:** System must comply with data protection regulations
+- **BR-025:** Platform must protect user data
+- **BR-026:** System must prevent fraud
+- **BR-027:** Platform must ensure transaction security
+- **BR-028:** System must comply with data protection regulations
 
 #### 6.2.3 Usability
-- **BR-025:** Platform must be intuitive for non-technical users
-- **BR-026:** System must support Myanmar language
-- **BR-027:** Platform must work on low-bandwidth connections
-- **BR-028:** System must provide offline capabilities
+- **BR-029:** Platform must be intuitive for non-technical users
+- **BR-030:** System must support Myanmar language
+- **BR-031:** Platform must work on low-bandwidth connections
+- **BR-032:** System must provide offline capabilities
 
 ---
 
