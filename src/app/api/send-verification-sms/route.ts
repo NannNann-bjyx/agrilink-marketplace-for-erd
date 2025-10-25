@@ -24,18 +24,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Send verification code using Twilio service
-    console.log('🔍 API: About to call twilioService.sendVerificationCode', {
-      userId,
-      phoneNumber
-    });
-    
     const result = await twilioService.sendVerificationCode(userId, phoneNumber);
-    
-    console.log('🔍 API: twilioService result:', result);
     
     if (!result.success) {
       const errorMessage = result.error || result.message || 'Failed to send verification code';
-      console.error('❌ API: Twilio service failed:', errorMessage);
       return NextResponse.json(
         { error: errorMessage },
         { 

@@ -1,6 +1,5 @@
 import { neon } from '@neondatabase/serverless';
 import twilio from 'twilio';
-import { smsCostMonitor } from '../services/smsCostMonitor';
 
 // Get database connection
 const getSql = () => {
@@ -44,15 +43,6 @@ class TwilioService {
    */
   async sendVerificationCode(userId: string, phoneNumber: string): Promise<TwilioSMSResult> {
     try {
-      // Check budget before sending SMS
-      const budgetCheck = smsCostMonitor.canSendSMS();
-      if (!budgetCheck.allowed) {
-        console.log(`🚫 SMS blocked: ${budgetCheck.reason}, remaining budget: $${budgetCheck.remainingBudget.toFixed(2)}`);
-        return {
-          success: false,
-          error: budgetCheck.reason || 'Budget exceeded'
-        };
-      }
 
       // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -112,8 +102,6 @@ class TwilioService {
             to: phoneNumber
           });
           
-          // Log cost for portfolio monitoring
-          smsCostMonitor.logSMSCost(userId, phoneNumber, 'verification');
           
           console.log(`✅ Twilio SMS sent to ${phoneNumber}, MessageId: ${result.sid}`);
           

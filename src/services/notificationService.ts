@@ -30,7 +30,7 @@ class NotificationService {
 
   private costs = {
     sms: 0.0732, // Myanmar rate
-    push: 0.000001, // AWS SNS
+    push: 0.000001, // Twilio SMS
     email: 0.0001, // AWS SES
     inApp: 0 // Free
   };

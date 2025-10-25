@@ -21,7 +21,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.916.0",
     "@aws-sdk/client-ses": "^3.907.0",
-    "@aws-sdk/client-sns": "^3.911.0",
     "@aws-sdk/s3-request-presigner": "^3.916.0",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-accordion": "^1.2.12",

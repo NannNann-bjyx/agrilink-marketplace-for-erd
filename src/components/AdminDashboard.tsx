@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { PortfolioSMSCostDashboard } from './PortfolioSMSCostDashboard';
 import { 
   CheckCircle, 
   XCircle, 
@@ -425,11 +424,8 @@ export function AdminDashboard({ currentAdmin, onBack, onNavigateToVerification,
             </Card>
           </div>
 
-          {/* Bottom Row - SMS Cost Dashboard & Reported Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* SMS Cost Dashboard - Portfolio Project */}
-            <PortfolioSMSCostDashboard />
-            
+          {/* Bottom Row - Reported Content */}
+          <div className="grid grid-cols-1 gap-6">
             {/* Reported Content */}
             <Card>
               <CardHeader>
