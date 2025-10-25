@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bell, X, CheckCircle, XCircle, Clock, FileText } from 'lucide-react';
+import { Bell, X, CheckCircle, XCircle, Clock, FileText, Truck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { ScrollArea } from './ui/scroll-area';
