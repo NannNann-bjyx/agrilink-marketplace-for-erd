@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'S3 connection successful',
-        bucket: process.env.AWS_S3_BUCKET_NAME,
+        bucket: process.env.AWS_S3_BUCKET || process.env.AWS_S3_BUCKET_NAME,
         region: process.env.AWS_REGION,
         mode: 'production'
       });
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         message: 'S3 connection failed',
-        bucket: process.env.AWS_S3_BUCKET_NAME,
+        bucket: process.env.AWS_S3_BUCKET || process.env.AWS_S3_BUCKET_NAME,
         region: process.env.AWS_REGION,
         mode: 'development'
       }, { status: 500 });
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   try {
     const config = {
       hasCredentials: !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY),
-      bucketName: process.env.AWS_S3_BUCKET_NAME,
+      bucketName: process.env.AWS_S3_BUCKET || process.env.AWS_S3_BUCKET_NAME,
       region: process.env.AWS_REGION,
       mode: process.env.AWS_ACCESS_KEY_ID ? 'production' : 'development'
     };
